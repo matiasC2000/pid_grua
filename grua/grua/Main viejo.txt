@@ -1,0 +1,70 @@
+/*
+ * grua.c
+ *
+ * Created: 7/12/2023 8:28:16 PM
+ * Author : Calvo
+ */ 
+
+#include <avr/io.h>
+#define F_CPU 16000000UL
+#include <util/delay.h>
+
+
+#include "sensor.h"
+#include "UART.h"
+#include "motor.h"
+
+void DescomponerDigitos(uint16_t);
+
+
+int main(void)
+{
+	//Inicializacion_Sensor();
+	Inicializacion_UART();
+	Inicializacion_Motor();	
+	sei();
+	
+	AgregarDatosBuffer("Va a vivir una experiencia unica\r\n");
+	uint8_t pasos=0;
+	uint16_t lectura;
+	
+	//setVelocidad(150);
+	
+	AgregarDatosBuffer("paso");
+	_delay_ms(1000);
+	while(1){
+		lectura = leerDato();
+		DescomponerDigitos(lectura);
+		_delay_ms(1000);
+		/*
+		movimientoSexy();
+		AgregarDatosBuffer("paso");
+		_delay_ms(500);
+		DescomponerDigitos((++pasos)*10);
+		_delay_ms(500);
+		*/
+	}
+}
+
+
+
+//de la mano de  mi amigo ChatGPT
+// Función para descomponer el número en dígitos
+void DescomponerDigitos(uint16_t numero)
+{
+	uint16_t divisor = 1000;
+	uint8_t digito;
+	uint16_t resto = numero;
+	
+	while (divisor >= 1)
+	{
+		digito = resto / divisor;
+		resto = resto % divisor;
+		divisor = divisor / 10;
+
+		AgregarDatoBuffer(digito+48);
+	}
+	AgregarDatoBuffer('\r');
+	AgregarDatoBuffer('\n');
+	AgregarDatoBuffer('\0');
+}
