@@ -31,7 +31,7 @@ int16_t static eant = 0, s = 0,posRef;
 //quieto en un punto y para que suba
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 
-int16_t static Kd = 0,Kp = -20, Ki=0;
+int16_t static Kd = 0,Kp = 20, Ki=0;
 
 //quieto en un punto y hace pendulo
 //int16_t static Kd = 0,Kp = 3, Ki=0;

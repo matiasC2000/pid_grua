@@ -26,11 +26,16 @@
 // 	H	H	H	1/16
 
 #define PASOS1  PORTB = (PORTB & 0b000111)|0b111000;			//PASOS de 1(1/16)
-#define PASOS2  PORTB = (PORTB & 0b000111)|0b011000;			//PASOS de 2(1/8)
+#define PASOS2  PORTB = (PORTB & 0b000111)|0b110000;			//PASOS de 2(1/8)
 #define PASOS4  PORTB = (PORTB & 0b000111)|0b010000;			//PASOS de 4(1/4)
-#define PASOS8  PORTB = (PORTB & 0b000111)|0b001000;			//PASOS de 8(1/2)
+#define PASOS8  PORTB = (PORTB & 0b000111)|0b100000;			//PASOS de 8(1/2)
 #define PASOS16 PORTB = (PORTB & 0b000111)|0b000000;			//PASOS de 16(1)
 
+//#define PASOS1  PORTB = (PORTB & 0b000111)|0b111000;			//PASOS de 1(1/16)
+//#define PASOS2  PORTB = (PORTB & 0b000111)|0b011000;			//PASOS de 2(1/8)
+//#define PASOS4  PORTB = (PORTB & 0b000111)|0b010000;			//PASOS de 4(1/4)
+//#define PASOS8  PORTB = (PORTB & 0b000111)|0b001000;			//PASOS de 8(1/2)
+//#define PASOS16 PORTB = (PORTB & 0b000111)|0b000000;			//PASOS de 16(1)
 
 // #define PASOS1  PORTC = 0b11111;			//PASOS de 1(1/16)
 // #define PASOS2  PORTC = 0b11011;			//PASOS de 2(1/8)
@@ -118,7 +123,7 @@ void Inicializacion_Motor(){
 	DDRD |= (1<<PORTD7);
 	
 	//pongo como salida los pines que controlan el tamaio de paso
-	DDRC |= (1<<PORTC0)|(1<<PORTC1)|(1<<PORTC2);
+	//borrar viejo DDRC |= (1<<PORTC0)|(1<<PORTC1)|(1<<PORTC2);
 	
 	TCCR1A =  0;
 	TCCR1B = (1<<WGM12)|(1<<CS12)|(1<<CS10); //modo CTC y preescaler de 1024
@@ -171,17 +176,15 @@ void darPaso(int8_t sentido){
 
 void buscarOrigen(){
 	//configurar el puerto de entrada pin6 D6
-	DDRD &= ~(1<<PORTD6);
+	DDRD &= ~(1<<PORTD4);
 	//colocar el pin con pull up
-	PORTD |= (1<<PORTD6);
-	//prendo el led
-	PORTD |= (1<<PORTD7);
+	PORTD |= (1<<PORTD4);
 	
 	setVelocidad(0);
 	
 	_delay_ms(500);			//espero un poco porque el pinta salir corriendo a veces
 	PASOS16;salto=16;
-	while((PIND & (1<<PORTD6))){	//mientras no toque el boton
+	while((PIND & (1<<PORTD4))){	//mientras no toque el boton
 		darPaso(-1);
 	}
 	//encuntra el inicio de a pasos muy grandes, lo vuelvo a buscar con pasos mas chiquitos
@@ -190,14 +193,17 @@ void buscarOrigen(){
 	irPos(50);
 	_delay_ms(500);//espero porque los pasos son tan rapidos que sigo precionando el boton
 	
+	//prendo el led
+	PORTD |= (1<<PORTD5);
+	
 	PASOS1;salto=1;
-	while((PIND & (1<<PORTD6))){	//mientras no toque el boton
+	while((PIND & (1<<PORTD4))){	//mientras no toque el boton
 		darPaso(-1);
 	}
 	
 	PASOS16;salto=16;
 	//apago el led
-	PORTD &= ~(1<<PORTD7);
+	PORTD &= ~(1<<PORTD5);
 	pos = 0;
 }
 

@@ -17,8 +17,8 @@
 #include <util/delay.h>
 
 //prendo el led
-#define ONLED PORTD |= (1<<PORTD7)
-#define OFFLED PORTD &= ~(1<<PORTD7)
+#define ONLED PORTD |= (1<<PORTD5)
+#define OFFLED PORTD &= ~(1<<PORTD5)
 
 int16_t angulo,anguloAnt,pos;
 int main(void)
@@ -30,9 +30,9 @@ int main(void)
 	SensorEncoder_init();
 	Inicializacion_slideResistor();
 	
-	DDRD |= (1 << PORTD7);  // Configura el pin D7 como salida
+	DDRD |= (1 << PORTD5);  // Configura el pin D7 como salida para el led
 	
-	sei();
+	sei(); //habilito las interrupciones
 	
 	
 	_delay_ms(50);
@@ -47,6 +47,8 @@ int main(void)
 	
 	getAnguloEncoder(&anguloAnt, 0);
 	
+
+	//Espera hasta que obtenga un lectura constante
 	while(i<3){
 		_delay_ms(2000);
 		getAnguloEncoder(&angulo, 0);
@@ -59,13 +61,17 @@ int main(void)
 		}
 	}
 	
+	//setea el centro de pendulo
 	set_origen();
 	OFFLED;
 	
-	
+	//se mueve hacia un lado para inciar la oscilacion
 	irPos(7000+16*5);
+
+
 	while (1) 
     {
+		//llama a la maquina de estados para inciar el control
 		SEOS_Dispatch_Tasks();
     }
 }
