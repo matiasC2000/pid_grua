@@ -1,0 +1,1 @@
+tiempoEnArreglo = 5

@@ -1,0 +1,507 @@
+
+#esta clase es una singleton que se ccomunica siempre con la UI
+
+import os
+
+from matplotlib import pyplot as plt
+import numpy as np
+
+from variablesGlobales import *
+
+
+
+from abc import ABC, abstractmethod
+import threading
+import serial as sr
+
+class GeneradorDatos(ABC):
+    def __init__(self):
+        self.array = []
+        self.estado_conexion = None
+        self.guardar = False
+        self.detener = False
+        self.file_path = ""
+        self.datoNuevoEnviar = False
+
+        self.hilo = None
+
+        self.t_values = [0]
+        self.set_values = [0]
+        self.d_values = [0]
+        self.i_values = [0]
+        self.e_values = [0]
+
+    @abstractmethod
+    def inicio(self,*args):
+        pass
+
+    def stop(self):
+        self.detener = True
+        self.guardar = False
+
+    @abstractmethod
+    def leer_datos(self):
+        pass
+
+
+    def get_datos(self):
+        if self.datoNuevoEnviar:
+            self.datoNuevoEnviar=False
+            return [self.t_values, self.e_values, self.set_values]
+        else:
+            return None
+
+    def guardar_archivo(self):
+        with open(self.file_path, 'a') as file:
+            data = f"{self.t_values[-1]};{self.e_values[-1]};{self.d_values[-1]};{self.i_values[-1]};{self.set_values[-1]}"
+            file.write('\n' + data)
+
+    @abstractmethod
+    def cambiar_coef_PID(self):
+        pass
+
+    def obtener_array(self):
+        return self.array
+
+    def start_hilo(self):
+        print("Hilo", "iniciado")
+        while not self.detener:
+            self.leer_datos()
+            self.actualizar_datos()
+            if self.guardar:
+                self.guardar_archivo()
+
+class GeneradorArduino(GeneradorDatos):
+    def __init__(self):
+        super().__init__()
+        self.estado_conexion = False
+        self.ecuacion = 0
+        self.s = None
+
+    def inicio(self,*args):
+        print("entro a inicio Arduino")
+        print(args[0][0])
+        if self.estado_conexion == False:
+            #si ya se conecto no creo otro hilo
+            try:
+                self.s = sr.Serial(args[0][0], 250000)                        #tengo que ver como le paso el parametro
+                #self.s.timeout = 5  # Establece un tiempo de espera de 5 segundos
+                self.hilo = threading.Thread(target=self.start_hilo)
+                self.hilo.start()
+                self.estado_conexion = True
+            except Exception as e:
+                self.estado_conexion = False
+                print('error de coneccion')
+
+    def leer_datos(self):
+        a = ""
+        try:
+            a = self.s.readline()
+        except Exception as e:
+            print("no se pudo leer, reconecto")
+            self.estado_conexion = False
+            self.detener = True
+        try:
+            a = a.decode()
+        except Exception as e:
+            print('fallo')
+            a=""
+        self.a = a
+
+    def actualizar_datos(self):
+        if self.a != "":
+            self.a = self.a.replace('\n',';')
+        data_values = self.a.split(';')
+        if len(data_values) == 6: #lleva un mas por uno que se agrega al final
+            if data_values[0].isdigit() and data_values[1].lstrip('-').isdigit() and data_values[2].lstrip('-').lstrip('-').isdigit() and data_values[3].lstrip('-').isdigit() and data_values[4].lstrip('-').isdigit():
+                self.t_values.append(int(data_values[0][0:])/1000)
+                if not data_values[1][0:] == self.e_values[-1]:
+                    self.e_values.append(int(data_values[1][0:]))
+                self.i_values.append(int(data_values[2][0:]))
+                self.d_values.append(int(data_values[3][0:]))
+                if self.ecuacion != 2:
+                    self.set_values.append(0)
+                else:
+                    self.set_values.append(int(data_values[4][0:]))
+                #print(t_values[-1],e_values[-1],set_values[-1])
+                self.datoNuevoEnviar = True
+        else:
+            print("Arduino: "+self.a)
+        while(self.t_values[-1] - self.t_values[0] > tiempoEnArreglo):
+            del self.t_values[0]
+            del self.e_values[0]
+            del self.set_values[0]
+
+    def cambiar_coef_PID(self,kp,ki,kd,ecuacion):
+        # Convertir los valores a bytes
+        self.ecuacion = ecuacion
+        mensaje = f"{kp} {ki} {kd} {ecuacion}\r\n".encode()  # Convertir a una cadena y luego a bytes
+
+        # Enviar el mensaje a través del puerto serie
+        self.s.write(mensaje)
+        print('Mensaje enviado:', mensaje)
+
+    def get_datos(self):
+        return [self.t_values,self.e_values,self.set_values]
+
+class GeneradorSimulacion(GeneradorDatos):
+    def __init__(self):
+        super().__init__()
+        print("se creo simulacion")
+        self.estado_conexion = True
+
+    def inicio(self, *args):
+        #Genero la inferface que quiero
+        print("inicio el hilo de simulacion")
+        self.simulador = Simulacion(int(args[0][0]),0)
+        self.hilo = threading.Thread(target=self.start_hilo)
+        self.hilo.start()
+
+    def leer_datos(self):
+        t, e, d, set_ = self.simulador.get_ultimo()
+        self.es_nuevo = t > self.t_values[-1] + 0.1
+        if self.es_nuevo:
+            self.t_values.append(t)
+            self.e_values.append(e)
+            self.d_values.append(d)
+            self.set_values.append(set_)
+            self.datoNuevoEnviar = True
+
+    def actualizar_datos(self):
+        #la tengo que dejar solo 2 seg en el arreglo
+        while(self.t_values[-1] - self.t_values[0] > tiempoEnArreglo):
+            del self.t_values[0]
+            del self.e_values[0]
+            del self.set_values[0]
+
+
+    def guardar_archivo(self):
+        if self.es_nuevo:
+            with open(self.file_path, 'a') as file:
+                data = f"{self.t_values[-1]};{self.e_values[-1]};{self.d_values[-1]};{self.i_values[-1]};{self.set_values[-1]}"
+                file.write('\n' + data)
+        
+        #me quedo esperando a que termine el tiempo que tiene que pasar
+
+    def cambiar_coef_PID(self,kp,ki,kd,ecuacion):
+        #me tengo que guardar los valores en esta clase para cuando me vuelvo a crear la otra se los paso
+        #cambiar los coef kp ki kd de las ecuaciones
+        print("mande datos")
+
+
+class InterfaceDatos:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+            # Si aún no se ha creado el generador de datos, créalo aquí
+            cls.generadordatos = GeneradorArduino()
+            cls.ruta = ""
+            cls.guardarDatos = False
+            cls.stateSimulacion = False
+        return cls._instance
+ 
+    def inicio(self, *args):
+        #esto lo llama el boton conecct o el lanzar
+        self.generadordatos.inicio(args)
+        print("interface Datos llama a inicio")
+
+    def detener(self):
+        self.generadordatos.stop()
+        print("espero a que termine el hilo")
+        if self.generadordatos.hilo != None:
+            print("estaba")
+            #self.generadordatos.hilo.join()
+        print("rip")
+
+    def actualizar_coef_PID(self, kp, ki ,kd,ecuacion):
+        print("simulacion", self.stateSimulacion)
+        self.generadordatos.cambiar_coef_PID(kp,ki ,kd,ecuacion)
+        pass
+
+    def cambiar_arduino(self):
+        if self.generadordatos != None:
+            self.generadordatos.stop()
+        self.generadordatos = GeneradorArduino()
+        
+    def cambiar_simulacion(self):
+        if self.generadordatos != None:
+            self.generadordatos.stop()
+        self.generadordatos = GeneradorSimulacion()
+
+    def inicio_guardar_datos(self):
+        #Chequear que no este guardando
+        #crear el archivo
+        if not self.guardarDatos:
+            print("inicio_guardar_datos")
+            output_folder = "datos"  # Carpeta para almacenar los archivos TXT
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
+            #cambiar la ruta
+            file_number = 1
+            while True:
+                filename = f'datos/datos_{file_number}.txt'
+                if not os.path.exists(filename):
+                    break
+                file_number += 1
+                # Obtener la ruta absoluta del archivo
+            
+            absolute_path = os.path.abspath(filename)
+            # Asignar la ruta absoluta al generador de datos
+            self.generadordatos.file_path = absolute_path
+            print("dir"+self.generadordatos.file_path)
+
+            #habilitar el guardado
+            self.generadordatos.guardar = True
+            self.guardarDatos = True
+            
+    def detener_guardar_datos(self):
+        print("detenet guarda")
+        #deshabilitar el guardado
+        self.generadordatos.guardar = False
+        self.guardarDatos = False
+
+    def get_estado(self):
+        return self.generadordatos.estado_conexion
+    
+    def get_datos(self):
+        return self.generadordatos.get_datos()
+    
+    def seleccionar_ruta(self, ruta):
+        self.ruta = ruta
+        print("selecionar archivo"+self.ruta)
+
+    def abrir_archivo(self):
+        #crear el grafico a partir de los datos
+        print("ruta: "+self.ruta)
+        with open(self.ruta, 'r') as archivo:
+            lineas = archivo.readlines()
+
+        t_values = []
+        e_values = []
+        i_values = []
+        d_values = []
+        set_values = []
+
+        for linea in lineas:
+            linea = linea.replace('\n',';')
+            data_values = linea.split(';')
+            if len(data_values)>4:
+                if data_values[0].isdigit() and data_values[1].lstrip('-').isdigit() and data_values[2].lstrip('-').lstrip('-').isdigit() and data_values[3].lstrip('-').isdigit() and data_values[4].lstrip('-').isdigit():
+                    t_values.append(int(data_values[0][0:]))
+                    e_values.append(int(data_values[1][0:]))
+                    d_values.append(int(data_values[2][0:]))
+                    i_values.append(int(data_values[3][0:]))
+                    set_values.append(int(data_values[4][0:]))
+
+        fig, axs = plt.subplots(1, 1, figsize=(10, 8))
+        #t_values = [x/1000 for x in t_values]
+
+        axs.plot(t_values, e_values,'.-')
+        axs.plot(t_values, set_values)
+        axs.set_xlabel('Time')
+        axs.set_ylabel('Pos')
+        axs.set_title('Pos vs Time')
+        axs.grid(True)
+
+        fig2, axs2 = plt.subplots(1, 1, figsize=(10, 8))
+
+        error = []
+        for i in range(len(e_values)):
+            error.append(e_values[i]-set_values[i])
+
+        axs2.plot(t_values, error,'r.-',label='error')
+        axs2.plot(t_values, d_values,'b',label='derivada')
+        axs2.plot(t_values, i_values,'g',label='integral')
+        axs2.set_xlabel('Time')
+        axs2.set_ylabel('Pos')
+        axs2.set_title('Pos vs Time')
+        axs2.grid(True)
+
+        plt.legend(loc="upper left")
+        fig.tight_layout()
+        plt.show()
+
+from math import tau
+import time
+
+class Simulacion:
+    def __init__(self, theta, theta_dot):
+        # Define las variables como atributos de instancia
+        self.kappa = 186.25294289
+        self.mu = 0.48631962
+        self.gamma = 0.5766281
+        self.Lambda = self.kappa/9.8
+
+        self.dt = 0.1*1/1000
+        self.dt_system = 30
+        self.full_step_time = 40*self.dt
+        self.step_size = 0.4*1/1000
+        self.car_reaction_time = 5*10
+        self.sensor_reaction_time = 3*10
+        self.derivative_calculation_time = 11*10
+        self.res = 1
+        self.Max_int = 0.5
+        self.Max_x = .2
+
+        # inicializa variables simuladas
+        self.i = 0
+        self.theta_int = 0
+        self.theta_mesured = theta
+        self.theta_dot_mesured = 0
+        self.move = False
+        self.waiting_time = 0
+        self.direc = None
+        self.wanted_direc = None
+        self.step_time = 0
+        self.theta = theta
+        self.theta_dot = theta_dot
+        self.Dtheta_dot = None
+        self.x = 0
+        self.v = 0
+        self.a = None 
+        self.error = None
+        
+        self.kp = 0
+        self.kd = 0
+        self.ki = 0
+
+        self.t = 0
+        self.e = 0
+        self.d = 0
+        self.set_ = 0
+
+
+        self.hilo = threading.Thread(target=self.nuevo_paso)
+        self.hilo.start()
+
+    def cap(self, val, Max): # capping a value to a maximum to the positives and negatives
+        return min(abs(val), Max) * np.sign(val)
+
+    def array_cap(self, val, Max): # =cap, used for ndarrays
+        return np.where(abs(val) < Max, val, Max)[0] * np.sign(val)
+
+    def PID(self, theta_int,theta,theta_dot):#PID system for controling the angle, returns a "velocity" which is used to calculate the time the car needs to wait until the next move
+        error = self.resolution(self.shift(self.theta,400),self.res)
+        response_vel = (
+            self.kp*error+
+            self.kd*self.theta_dot +
+            self.ki*self.theta_int
+            )
+        response_vel = self.cap(response_vel, self.step_size/(self.car_reaction_time*self.dt))
+        return -response_vel
+
+    def resolution(self, val, Min): # return the value unless its under the resolution of the sensor in which case returns zero
+        return np.where(np.abs(val) > Min, val, 0)
+
+    def Dtheta_dot_func(self, theta, theta_dot, a): # calculate the angle acceleration according to the model, taking the car's motion into account
+        Dtheta_dot = -self.Lambda * a * np.cos(theta * tau / 800) - self.kappa * np.sin(theta * tau / 800) - self.mu * theta_dot * tau / 800
+        Dtheta_dot = np.where((np.abs(Dtheta_dot) < np.abs(self.gamma)) & (theta_dot == 0), 0, Dtheta_dot - self.gamma * np.sign(theta_dot))
+        Dtheta_dot /= tau / 800
+        return Dtheta_dot
+
+    def sensor_actualize(self, theta): # get the information of the angle save it as a variable used for control and add to the integral
+        if not self.i % self.derivative_calculation_time:
+            self.theta_dot_mesured = np.round(theta) - self.theta_mesured
+        self.theta_mesured = np.round(theta)
+        error = self.resolution(self.shift(self.theta_mesured, 400), self.res)
+        self.theta_int += error * self.sensor_reaction_time * self.dt
+        self.theta_int = self.cap(self.theta_int, self.Max_int)
+
+    def shift(self, angle, shift, tau=800): # cap the angle's possible values to -400 to +400 so the PID finds the closest way to get to the needed angle
+        return (angle - shift + tau / 2) % tau - tau / 2
+    
+    def step_func(self, t):
+        # Compute position, velocity, and acceleration functions
+        x = -np.sin(tau * t / self.full_step_time) + tau * t / self.full_step_time
+        v = -tau / self.full_step_time * np.cos(tau * t / self.full_step_time) + tau / self.full_step_time
+        a = (tau / self.full_step_time) ** 2 * np.sin(tau * t / self.full_step_time)
+        # Scale by step_size/tau
+        x *= self.step_size / tau
+        v *= self.step_size / tau
+        a *= self.step_size / tau
+        return x, v, a
+    
+    def car_actualize(self, new_waiting_time):
+        if self.waiting_time <= 0:
+            self.move = True
+            self.direc = self.wanted_direc
+            self.waiting_time = new_waiting_time
+        else:
+            self.waiting_time = min(self.waiting_time - self.dt_system, new_waiting_time)
+
+    def car_physics(self):
+        if self.move:
+            delta_x, v, a = self.step_func(self.step_time)
+            self.step_time += self.dt
+            if self.step_time > self.full_step_time:
+                self.move = False
+                self.step_time = 0
+            return self.direc * np.array((delta_x, v, a))
+        else:
+            return np.zeros(3)  # Return zero if the car isn't moving
+    
+    def physics(self):
+        if self.move:
+            delta_x, self.v, self.a = self.car_physics()
+            self.x += self.v * self.dt
+        else:
+            self.x, self.v, self.a = self.x, 0, 0
+        
+        self.Dtheta_dot = self.Dtheta_dot_func(self.theta, self.theta_dot, self.a)
+        self.theta += self.theta_dot * self.dt
+        self.theta_dot += self.Dtheta_dot * self.dt
+    
+    def control(self):
+        if not self.i % self.sensor_reaction_time:
+            self.sensor_actualize(self.theta)
+        
+        response_vel = self.PID(self.theta_int, self.theta_mesured, self.theta_dot_mesured)    
+        self.wanted_direc = np.sign(response_vel)
+        
+        if response_vel != 0:
+            new_waiting_time = abs(self.step_size / response_vel)
+        else:
+            new_waiting_time = 10000000
+        
+        self.car_actualize(new_waiting_time)
+
+    def actualizar_datos_salida(self):
+        self.t = self.i*self.dt
+        self.e = self.theta_mesured
+        self.d = self.theta_dot_mesured
+        self.set_ = None        
+
+    def nuevo_paso(self):
+        #20000 son 2 seg
+        while self.i < 20000: #0.1*1/1000
+            inicio = time.time()
+            self.physics()
+            if not self.i % self.dt_system:
+                self.control()
+                self.actualizar_datos_salida()
+            if abs(self.x) > self.Max_x:
+                print('car fell')
+                raise Exception 
+            while time.time() - inicio < self.dt:
+                pass
+            self.i += 1
+
+    def get_ultimo(self):
+        return (self.t, self.e, self.d, self.set_)
+
+
+if __name__ == "__main__":
+    #datos = InterfaceDatos()
+    #datos.cambiar_simulacion()
+    #datos.inicio(300)
+
+    
+    simu = Simulacion(300,0)
+    inicio = time.time()
+    simu.nuevo_paso()
+    fin = time.time()
+    timpoTardo = fin-inicio
+    print("2 seg lo hizo en: %f",timpoTardo)
+
