@@ -2,6 +2,7 @@
 #esta clase es una singleton que se ccomunica siempre con la UI
 
 import os
+import pandas as pd
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -21,6 +22,7 @@ class GeneradorDatos(ABC):
         self.guardar = False
         self.detener = False
         self.file_path = ""
+        self.file_path_ref = ""
         self.datoNuevoEnviar = False
 
         self.hilo = None
@@ -77,6 +79,7 @@ class GeneradorArduino(GeneradorDatos):
         self.estado_conexion = False
         self.ecuacion = 0
         self.s = None
+        self.file_path_ref = "arduino"
 
     def inicio(self,*args):
         print("entro a inicio Arduino")
@@ -149,23 +152,47 @@ class GeneradorSimulacion(GeneradorDatos):
         super().__init__()
         print("se creo simulacion")
         self.estado_conexion = True
+        self.file_path_ref = "simulacion"
+        self.kp = 1
+        self.ki = 0
+        self.kd = 0
 
     def inicio(self, *args):
         #Genero la inferface que quiero
         print("inicio el hilo de simulacion")
-        self.simulador = Simulacion(int(args[0][0]),0)
-        self.hilo = threading.Thread(target=self.start_hilo)
+        self.estado_conexion = False
+        self.simulador = Simulacion(int(args[0][0]),0,self.kp,self.ki,self.kd)
+        self.hilo = threading.Thread(target=self.mira_el_otro_hilo)
         self.hilo.start()
 
+    def mira_el_otro_hilo(self):
+        while(not self.simulador.fin):
+            pass
+        dato = InterfaceDatos()
+        dato.inicio_guardar_datos()
+        datos = self.simulador.get_datos()
+        df = pd.DataFrame({
+            't': datos[0],
+            'e': datos[1],
+            'i': datos[2],
+            'd': datos[3],
+            'set': datos[4]
+        })
+
+        # Guardar el DataFrame en un archivo separado por punto y coma
+        df.to_csv(self.file_path, sep=';', index=False)
+        self.estado_conexion = True
+
     def leer_datos(self):
-        t, e, d, set_ = self.simulador.get_ultimo()
-        self.es_nuevo = t > self.t_values[-1] + 0.1
+        t, e, i, d, set_ = self.simulador.get_ultimo()
+        self.es_nuevo = t != self.t_values[-1]
         if self.es_nuevo:
             self.t_values.append(t)
             self.e_values.append(e)
+            self.i_values.append(i)
             self.d_values.append(d)
             self.set_values.append(set_)
-            self.datoNuevoEnviar = True
+            self.datoNuevoEnviar = False
 
     def actualizar_datos(self):
         #la tengo que dejar solo 2 seg en el arreglo
@@ -184,8 +211,9 @@ class GeneradorSimulacion(GeneradorDatos):
         #me quedo esperando a que termine el tiempo que tiene que pasar
 
     def cambiar_coef_PID(self,kp,ki,kd,ecuacion):
-        #me tengo que guardar los valores en esta clase para cuando me vuelvo a crear la otra se los paso
-        #cambiar los coef kp ki kd de las ecuaciones
+        self.kp = float(kp)
+        self.ki = float(ki)
+        self.kd = float(kd)
         print("mande datos")
 
 
@@ -241,7 +269,7 @@ class InterfaceDatos:
             #cambiar la ruta
             file_number = 1
             while True:
-                filename = f'datos/datos_{file_number}.txt'
+                filename = f'datos/datos_{self.generadordatos.file_path_ref}_{file_number}.txt'
                 if not os.path.exists(filename):
                     break
                 file_number += 1
@@ -251,6 +279,9 @@ class InterfaceDatos:
             # Asignar la ruta absoluta al generador de datos
             self.generadordatos.file_path = absolute_path
             print("dir"+self.generadordatos.file_path)
+
+            with open(self.generadordatos.file_path, 'a') as file:
+                file.write("t;e;d;i;set"+'\n')            
 
             #habilitar el guardado
             self.generadordatos.guardar = True
@@ -280,20 +311,17 @@ class InterfaceDatos:
 
         t_values = []
         e_values = []
-        i_values = []
         d_values = []
+        i_values = []
         set_values = []
 
-        for linea in lineas:
-            linea = linea.replace('\n',';')
-            data_values = linea.split(';')
-            if len(data_values)>4:
-                if data_values[0].isdigit() and data_values[1].lstrip('-').isdigit() and data_values[2].lstrip('-').lstrip('-').isdigit() and data_values[3].lstrip('-').isdigit() and data_values[4].lstrip('-').isdigit():
-                    t_values.append(int(data_values[0][0:]))
-                    e_values.append(int(data_values[1][0:]))
-                    d_values.append(int(data_values[2][0:]))
-                    i_values.append(int(data_values[3][0:]))
-                    set_values.append(int(data_values[4][0:]))
+        data = pd.read_csv(self.generadordatos.file_path, delimiter=';')
+
+        t_values = data['t'].tolist()  # 't_column' es el nombre de la columna que contiene los valores de t
+        e_values = data['e'].tolist()  # 'e_column' es el nombre de la columna que contiene los valores de e
+        d_values = data['d'].tolist()  # 'd_column' es el nombre de la columna que contiene los valores de d
+        i_values = data['i'].tolist()  # 'i_column' es el nombre de la columna que contiene los valores de i
+        set_values = data['set'].tolist()  # 'set_column' es el nombre de la columna que contiene los valores de set
 
         fig, axs = plt.subplots(1, 1, figsize=(10, 8))
         #t_values = [x/1000 for x in t_values]
@@ -327,7 +355,11 @@ from math import tau
 import time
 
 class Simulacion:
-    def __init__(self, theta, theta_dot):
+    def __init__(self, theta, theta_dot, kp,ki,kd):
+        self.fin = False
+        self.igual = 0
+        self.detener = False
+
         # Define las variables como atributos de instancia
         self.kappa = 186.25294289
         self.mu = 0.48631962
@@ -363,14 +395,15 @@ class Simulacion:
         self.a = None 
         self.error = None
         
-        self.kp = 0
-        self.kd = 0
-        self.ki = 0
+        self.kp = kp
+        self.kd = kd
+        self.ki = ki
 
-        self.t = 0
-        self.e = 0
-        self.d = 0
-        self.set_ = 0
+        self.t = [0,0]
+        self.int = [0,0]
+        self.e = [0,0]
+        self.d = [0,0]
+        self.set_ = [0,0]
 
 
         self.hilo = threading.Thread(target=self.nuevo_paso)
@@ -468,28 +501,38 @@ class Simulacion:
         self.car_actualize(new_waiting_time)
 
     def actualizar_datos_salida(self):
-        self.t = self.i*self.dt
-        self.e = self.theta_mesured
-        self.d = self.theta_dot_mesured
-        self.set_ = None        
+        self.t.append(self.i*self.dt)
+        self.int.append(self.theta_int)
+        self.e.append(self.theta_mesured)
+        self.d.append(self.theta_dot_mesured)
+        self.set_.append(0)      
 
     def nuevo_paso(self):
-        #20000 son 2 seg
-        while self.i < 20000: #0.1*1/1000
+        while self.i < 400000 and not self.detener: #0.1*1/1000
             inicio = time.time()
             self.physics()
             if not self.i % self.dt_system:
                 self.control()
                 self.actualizar_datos_salida()
+                if self.e[-1] == self.e[-2]:
+                    self.igual = self.igual + 1
+                    if self.igual == 40:
+                        self.detener = True
+                else:
+                    self.igual = 0
+            
             if abs(self.x) > self.Max_x:
                 print('car fell')
                 raise Exception 
-            while time.time() - inicio < self.dt:
-                pass
+            #total += time.time() - inicio
             self.i += 1
+        self.fin = True
+
+    def get_datos(self):
+        return (self.t, self.e, self.int ,self.d, self.set_)
 
     def get_ultimo(self):
-        return (self.t, self.e, self.d, self.set_)
+        return (self.t[-1], self.e[-1], self.int[-1], self.d[-1], self.set_[-1])
 
 
 if __name__ == "__main__":

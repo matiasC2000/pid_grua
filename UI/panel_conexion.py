@@ -48,8 +48,10 @@ class PanelConexion(LabelPanelBase):
         datos = InterfaceDatos()
         if datos.get_estado():
             self.panel_arduino.connect_button.config(bg='light green')
+            self.panel_simulacion.set_button.config(bg='light green')
         else:
             self.panel_arduino.connect_button.config(bg='light coral')
+            self.panel_simulacion.set_button.config(bg='light coral')
         self.ventana.after(100, self.start) # in milliseconds, 1000 for 1 second
 
 
