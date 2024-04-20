@@ -56,7 +56,7 @@ class PanelDibujo():
                 if(t_values[-1]>self.valAnt+2):
                     self.valAnt = t_values[-1]
                     self.ax.clear()
-                    self.ax.set_xlim(t_values[0], t_values[-1]+10)
+                    self.ax.set_xlim(t_values[0], t_values[-1]+2)
                     self.ax.set_ylim(self.valor_ecuacion[0], self.valor_ecuacion[1])
 
                 self.ax.plot(t_values[0:-1],e_values[0:-1], color="blue")

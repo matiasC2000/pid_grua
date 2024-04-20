@@ -28,19 +28,19 @@ class PanelPID(LabelPanelBase):
         lbl_Kp = LabelBase(master=self, text="Kp")
         lbl_Kp.grid(row=0, column=1, padx=5)
         self.entKp = Entry(self, width=15)
-        self.entKp.insert(0, "0")
+        self.entKp.insert(0, "0.0")
         self.entKp.grid(row=1, column=1, padx=5, pady=5)
         
         lbl_Ki = LabelBase(master=self, text="Ki")
         lbl_Ki.grid(row=0, column=2, padx=5, pady=1)
         self.entKi = Entry(self, width=15)
-        self.entKi.insert(0, "0")
+        self.entKi.insert(0, "0.0")
         self.entKi.grid(row=1, column=2, padx=5)
         
         lbl_Kd = LabelBase(master=self, text="Kd")
         lbl_Kd.grid(row=0, column=3, padx=5)
         self.entKd = Entry(self, width=15)
-        self.entKd.insert(0, "0")
+        self.entKd.insert(0, "0.0")
         self.entKd.grid(row=1, column=3, padx=5, pady=5)
 
         self.ecucacion = Combobox(

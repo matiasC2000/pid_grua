@@ -2,6 +2,20 @@ from tkinter import *
 from panel_control import PanelControl
 from panel_dibujo import PanelDibujo
 from datos import InterfaceDatos
+from variablesGlobales import *
+
+import os
+import pandas as pd
+
+from matplotlib import pyplot as plt
+import numpy as np
+from abc import ABC, abstractmethod
+import threading
+import serial as sr
+
+from math import tau
+import time
+
 
 class PanelPrincipal(Tk):
     def __init__(self, *args, **kwargs):

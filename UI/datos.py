@@ -8,9 +8,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 from variablesGlobales import *
-
-
-
 from abc import ABC, abstractmethod
 import threading
 import serial as sr
@@ -80,6 +77,7 @@ class GeneradorArduino(GeneradorDatos):
         self.ecuacion = 0
         self.s = None
         self.file_path_ref = "arduino"
+        self.kd = 0
 
     def inicio(self,*args):
         print("entro a inicio Arduino")
@@ -121,7 +119,10 @@ class GeneradorArduino(GeneradorDatos):
                 if not data_values[1][0:] == self.e_values[-1]:
                     self.e_values.append(int(data_values[1][0:]))
                 self.i_values.append(int(data_values[2][0:]))
-                self.d_values.append(int(data_values[3][0:]))
+                if int(data_values[3][0:]) != 0:
+                    self.d_values.append(5000/int(data_values[3][0:]))
+                else:
+                    self.d_values.append(5000)
                 if self.ecuacion != 2:
                     self.set_values.append(0)
                 else:
@@ -138,6 +139,7 @@ class GeneradorArduino(GeneradorDatos):
     def cambiar_coef_PID(self,kp,ki,kd,ecuacion):
         # Convertir los valores a bytes
         self.ecuacion = ecuacion
+        self.kd = kd
         mensaje = f"{kp} {ki} {kd} {ecuacion}\r\n".encode()  # Convertir a una cadena y luego a bytes
 
         # Enviar el mensaje a través del puerto serie
@@ -153,7 +155,7 @@ class GeneradorSimulacion(GeneradorDatos):
         print("se creo simulacion")
         self.estado_conexion = True
         self.file_path_ref = "simulacion"
-        self.kp = 1
+        self.kp = 0
         self.ki = 0
         self.kd = 0
 
@@ -315,7 +317,7 @@ class InterfaceDatos:
         i_values = []
         set_values = []
 
-        data = pd.read_csv(self.generadordatos.file_path, delimiter=';')
+        data = pd.read_csv(self.ruta, delimiter=';')
 
         t_values = data['t'].tolist()  # 't_column' es el nombre de la columna que contiene los valores de t
         e_values = data['e'].tolist()  # 'e_column' es el nombre de la columna que contiene los valores de e
@@ -354,6 +356,7 @@ class InterfaceDatos:
 from math import tau
 import time
 
+
 class Simulacion:
     def __init__(self, theta, theta_dot, kp,ki,kd):
         self.fin = False
@@ -372,10 +375,14 @@ class Simulacion:
         self.step_size = 0.4*1/1000
         self.car_reaction_time = 5*10
         self.sensor_reaction_time = 3*10
+        #la derivada se calcula cada 30ms nose cual es la unidad aca
         self.derivative_calculation_time = 11*10
         self.res = 1
         self.Max_int = 0.5
         self.Max_x = .2
+
+        self.tiempoAnt=[0,0]
+        self.posAnt=[0,0]
 
         # inicializa variables simuladas
         self.i = 0
@@ -414,11 +421,49 @@ class Simulacion:
 
     def array_cap(self, val, Max): # =cap, used for ndarrays
         return np.where(abs(val) < Max, val, Max)[0] * np.sign(val)
+    
+    def calcularSen(self, sen):
+        sen2 = [0,7,15,23,31,39,47,54,62,70,78,86,94,101,109,117,125,133,140,148,156,164,171,179,187,195,202,210,218,225,233,241,248,256,263,271,278,286,294,301,309,316,323,331,338,346,353,360,368,375,382,389,397,404,411,418,425,432,439,446,453,460,467,474,481,488,495,502,509,515,522,529,535,542,549,555,562,568,575,581,587,594,600,606,612,619,625,631,637,643,649,655,661,667,673,678,684,690,695,701,707,712,718,723,728,734,739,744,750,755,760,765,770,775,780,785,790,794,799,804,809,813,818,822,827,831,835,840,844,848,852,856,860,864,868,872,876,880,883,887,891,894,898,901,904,908,911,914,917,920,923,926,929,932,935,938,940,943,946,948,951,953,955,958,960,962,964,966,968,970,972,974,975,977,979,980,982,983,985,986,987,988,990,991,992,993,993,994,995,996,996,997,998,998,998,999,999,999,999,999,1000]
+        sen = int(sen)
+        sen= sen%800
+        if sen<0:
+            sen = 800+sen
+        if sen>399:
+            sen = sen%400
+            if sen>200: sen = 200- sen%200
+            sen = - sen2[sen]
+        else:
+            sen = sen%400
+            if sen>200: sen = 200-(sen%200)
+            sen = sen2[sen]
+        return sen
+    
+    
+    def derivative_calculation_PID(self,theta):
+        e = theta
+        derivative = 0
+        if e == self.posAnt[0]:
+            derivative = e-self.posAnt[1]
+            tiempoDev = self.i-self.tiempoAnt[1]
+            derivative = derivative#/tiempoDev	
+        if e != self.posAnt[0] :
+            derivative = e-self.posAnt[0]
+            tiempoDev = self.i-self.tiempoAnt[0]
+            derivative = derivative
+			
+            self.posAnt[1]=self.posAnt[0]
+            self.tiempoAnt[1]=self.tiempoAnt[0]
+            self.posAnt[0]=e
+            self.tiempoAnt[0]=self.i
+        return derivative
 
     def PID(self, theta_int,theta,theta_dot):#PID system for controling the angle, returns a "velocity" which is used to calculate the time the car needs to wait until the next move
-        error = self.resolution(self.shift(self.theta,400),self.res)
+        self.errorPID = theta
+        #self.errorPID = self.resolution(self.shift(theta,400),self.res)
+        #self.errorPID = self.calcularSen(self.errorPID)
+        #theta_dot = self.derivative_calculation_PID(self.errorPID)
         response_vel = (
-            self.kp*error+
+            self.kp*self.errorPID+
             self.kd*self.theta_dot +
             self.ki*self.theta_int
             )
@@ -455,6 +500,7 @@ class Simulacion:
         v *= self.step_size / tau
         a *= self.step_size / tau
         return x, v, a
+                
     
     def car_actualize(self, new_waiting_time):
         if self.waiting_time <= 0:
@@ -481,7 +527,9 @@ class Simulacion:
             self.x += self.v * self.dt
         else:
             self.x, self.v, self.a = self.x, 0, 0
-        
+        if abs(self.x) > self.Max_x:
+            if self.x>0: self.x = self.Max_x
+            else: self.x = - self.Max_x
         self.Dtheta_dot = self.Dtheta_dot_func(self.theta, self.theta_dot, self.a)
         self.theta += self.theta_dot * self.dt
         self.theta_dot += self.Dtheta_dot * self.dt
@@ -503,12 +551,12 @@ class Simulacion:
     def actualizar_datos_salida(self):
         self.t.append(self.i*self.dt)
         self.int.append(self.theta_int)
-        self.e.append(self.theta_mesured)
+        self.e.append(self.errorPID)
         self.d.append(self.theta_dot_mesured)
         self.set_.append(0)      
 
     def nuevo_paso(self):
-        while self.i < 400000 and not self.detener: #0.1*1/1000
+        while self.i < 200000 and not self.detener: #0.1*1/1000
             inicio = time.time()
             self.physics()
             if not self.i % self.dt_system:
@@ -516,14 +564,14 @@ class Simulacion:
                 self.actualizar_datos_salida()
                 if self.e[-1] == self.e[-2]:
                     self.igual = self.igual + 1
-                    if self.igual == 40:
+                    if self.igual == 100:
                         self.detener = True
                 else:
                     self.igual = 0
             
-            if abs(self.x) > self.Max_x:
-                print('car fell')
-                raise Exception 
+            #if abs(self.x) > self.Max_x:
+                #print('car fell')
+                #raise Exception 
             #total += time.time() - inicio
             self.i += 1
         self.fin = True
