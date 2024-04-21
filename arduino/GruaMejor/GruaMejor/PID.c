@@ -15,6 +15,8 @@
 #include "slideResistor.h"
 #include "global.h"
 
+#define CANT_DERIVATE 6
+
 #define ZONAMUERTA 0
 #define ZONAMUERTAI 10000
 
@@ -40,10 +42,10 @@ float static Kd = 0,Kp = 0.1, Ki=0;
 //quieto en un punto y hace pendulo
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 
-uint8_t FLAG_habilitar_PID=1;
-float static vel, s = 0,derivadas[10],posRef;
-int16_t static derivada=0,e,tiempoDev,valor;
-uint32_t static tiempoMuestra=0;
+uint8_t FLAG_habilitar_PID=1,i_derivative=0;
+float static vel, s = 0,derivadas[20],posRef, derivada=0;
+int16_t static e,tiempoDev,valor;
+int16_t static tiempoMuestra=0;
 uint8_t vecesIgual=1,indice_ec_error = 0;
 
 enum Indices_ec {
@@ -142,8 +144,22 @@ void calcularDerivada(int16_t e){
 	
 	//quiero dos calculando cada 30 con un desfase de 15 y algun desface
 	
-	if(getTiempoSEOS()>tiempoAnt[0]+30){	//era 60
-		
+	i_derivative = (i_derivative+1)%CANT_DERIVATE;
+	derivadas[i_derivative] = (tiempoMuestra);
+	uint8_t k;
+	int32_t total = 0;
+	/*for(k=0;k<CANT_DERIVATE;k++){
+		total = total + derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE];
+	}
+	derivada = total/CANT_DERIVATE;*/
+	derivada =  0.02 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE] +
+				0.14 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE] +
+				0.34 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE] +
+				0.34 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE] +
+				0.14 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE] +
+				0.02 * derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE];
+	//derivada = 0.166 * derivadas[0]+ 0.166 * derivadas[1] + 0.166 * derivadas[2]+0.166 * derivadas[3]+0.166 * derivadas[4]+0.166 * derivadas[5];
+		/*
 		if(e == posAnt[0]){
 			derivada = (e-posAnt[1]);	//*100		  //maximo 47
 			tiempoDev = (getTiempoSEOS()-tiempoAnt[1]);//suele ser <20 cuando se mueve cayendo y 50 cuando va lento pero se mueve
@@ -152,15 +168,15 @@ void calcularDerivada(int16_t e){
 		
 		if(e != posAnt[0]){
 			derivada = (e-posAnt[0]);//*100;		  //maximo 47
-			tiempoDev = (tiempoMuestra-tiempoAnt[0]);//suele ser <20 cuando se mueve cayendo y 50 cuando va lento pero se mueve
+			tiempoDev = (getTiempoSEOS()-tiempoAnt[0]);//suele ser <20 cuando se mueve cayendo y 50 cuando va lento pero se mueve
 			derivada = derivada;///tiempoDev;
 			
 			posAnt[1]=posAnt[0];
 			tiempoAnt[1]=tiempoAnt[0];
 			posAnt[0]=e;
-			tiempoAnt[0]=tiempoMuestra;
+			tiempoAnt[0]=getTiempoSEOS();
 		}
-	}/*else{
+	}*//*else{
 		derivadas[2] = derivadas[1];
 		derivadas[1] = derivadas[0];
 		derivadas[0] = (e-posAnt[0]);
@@ -228,7 +244,7 @@ float ec_basico(){
 	calcularDerivada(e);
 	calcularIntegral(e);
 	
-	return( (multi*Kp)*e + Kd*derivada + Ki*s);
+	return( (multi*Kp)*e + Kd*5000/derivada + Ki*s);
 }
 
 float ec_sin_sen(){	

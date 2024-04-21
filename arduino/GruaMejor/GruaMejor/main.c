@@ -22,7 +22,6 @@ int main(void)
 {	
 	uint8_t i=0;
 	UART_Init();
- 	SEOS_Init();
 	Inicializacion_Motor();
 	SensorEncoder_init();
 	Inicializacion_slideResistor();
@@ -32,9 +31,9 @@ int main(void)
 	
 	sei(); //habilito las interrupciones
 	
-	_delay_ms(50);
+	//_delay_ms(50);
 	Informar_MensajeInicial();
-	
+	/*
 	setVelocidad(0);
 	buscarOrigen();
 	
@@ -63,8 +62,8 @@ int main(void)
 	
 	//se mueve hacia un lado para inciar la oscilacion
 	irPos(7000+16*5);
-
-
+	*/
+	SEOS_Init();
 	while (1) 
     {
 		//llama a la maquina de estados para inciar el control

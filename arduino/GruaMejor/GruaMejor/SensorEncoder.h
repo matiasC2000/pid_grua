@@ -16,6 +16,6 @@
 
 void SensorEncoder_init();
 
-void getAnguloEncoder(int16_t *anguloOUT, uint32_t *tiempoMuestraOUT);
+void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT);
 
 #endif /* SENSORENCODER_H_ */

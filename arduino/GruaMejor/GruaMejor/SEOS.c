@@ -18,15 +18,17 @@ por lo tanto informo cada 25 ms que es 40 veces por segundo
 #include "button.h"
 #include "leerDatos.h"
 
+#define MULTIPLICADOR_MS 50
+
 
 static unsigned char contInformo=0,contPID=1,contButtton=3,contTiempo=0,contLeerDatos=5;			
 
 
 volatile unsigned char Flag_Informo=0,Flag_PID=0,Flag_Button=0,Flag_leerDatos=0;
-volatile uint32_t tiempoSEOS=0;
+volatile uint32_t tiempoSEOS=0,tiempoInforme=0;
 
 uint32_t getTiempoSEOS(){
-	return tiempoSEOS;
+	return tiempoInforme;
 }
 
 void SEOS_SCH_Tasks (void)
@@ -34,23 +36,23 @@ void SEOS_SCH_Tasks (void)
 	/*
 	  llamo a las tareas que tengo que hacer
 	*/
-	if (++contPID==3) {
+	if (++contPID==1) {
 		Flag_PID=1;				//Tarea programada cada 3ms
 		contPID=0;
 	}
-	if (++contInformo==3) {
+	if (++contInformo==3*MULTIPLICADOR_MS) {
 		Flag_Informo=1;			//Tarea programada cada 3 ms
 		contInformo=0;
-	}	if (++contButtton==5) {
+	}	if (++contButtton==5*MULTIPLICADOR_MS) {
 		Flag_Button=1;			//Tarea programada cada 5 ms
 		contButtton=0;
-	}	if (++contLeerDatos==20) {
+	}	if (++contLeerDatos==20*MULTIPLICADOR_MS) {
 		Flag_leerDatos=1;			//Tarea programada cada 20 ms
 		contLeerDatos=0;
 	}}void SEOS_Dispatch_Tasks(void){	if(Flag_Informo){		Informar_Actulizar();		Flag_Informo = 0;	}	if(Flag_PID){		Actulizar_PID();		Flag_PID = 0;	}	if(Flag_Button){		button_Actulizar();		Flag_Button = 0;	}	if(Flag_leerDatos){		actulizar_leerDatos();		Flag_leerDatos=0;	}}//inicializador del sOESvoid SEOS_Init(){	/*		configurar el reloj
 		el reloj tiene que funcionar cada 50ms, ya que es el tiempo mas chico
 		como no llega a 50ms, cuento hasta 50 cada 1ms
-		para tener mayor exactitud uso 1 ms	*/	OCR0A  = 249;			//249+1
-	TCCR0A = (1<<COM0A0) | (1<<WGM01);		//modo CTC, Toggle on compare match
-	TCCR0B = (1<<CS01)|(1<<CS00);			//CTC CLK/64 =16MHz/64 =250KHz prescalar en 64
-	TIMSK0 = (1<<OCIE0A);					//habilitamos interrpución COMPA}//configurar la interrupción del clock//interrupción periódica cada 250/250kHz=1msISR(TIMER0_COMPA_vect){	SEOS_SCH_Tasks();	if(contTiempo++<10){		tiempoSEOS++;		contTiempo=0;	}}
+		para tener mayor exactitud uso 1 ms	*/	TCCR0A = (1 << WGM01);  // Modo CTC
+	TCCR0B = (1 << CS01);   // Prescaler de 8
+	OCR0A = 39;
+	TIMSK0 = (1<<OCIE0A);					//habilitamos interrpución COMPA}//configurar la interrupción del clock//interrupción periódica cada 50kHz= 0.05msISR(TIMER0_COMPA_vect){	SEOS_SCH_Tasks();	tiempoSEOS++;	if(contTiempo++>MULTIPLICADOR_MS){		tiempoInforme++;	//cuenta ms		contTiempo=0;	}}

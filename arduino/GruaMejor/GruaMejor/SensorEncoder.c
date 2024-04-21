@@ -24,9 +24,12 @@
 #define LEERIZQ PIND & (1<<PORTD3)
 #define LEERDER PIND & (1<<PORTD2)
 
-int16_t static volatile angulo = 0;
+int16_t static volatile angulo = 0,derivate_counter_D=0,derivate_counter_I=0;
+int16_t static anguloANt=0;
 uint8_t static volatile IZQ=0,DER=0;
 uint32_t static volatile tiempoMuestra =0;
+
+int16_t static derivate_D=0,derivate_I=0,axiAnt;
 
 typedef enum {CeroCero,UnoCero,CeroUno,UnoUno} state;
 state static volatile estado;
@@ -40,6 +43,16 @@ void (*MEF[])(void)={f00,f10,f01,f11};
 
 
 void set_origen();
+
+
+/*
+calcular la derivada del angulo aca la longitud es fija pero el tiempo es el que varia
+antes lo hacia al revez
+que boludo
+
+puedo calculos
+calcular con un clock mucho mas mejor
+*/
 
 void SensorEncoder_init(){
 	//PORTD2 es INT0 es sensor derecha un 1 en el sensor es que esta tapado
@@ -60,14 +73,29 @@ void SensorEncoder_init(){
 	EICRA &= ~(1<<ISC11);
 	//puse a INT1 para activarse cuando sube y cuando baja
 	
+	// Configuración del Timer 2 en modo CTC (Clear Timer on Compare Match)
+	TCCR2A = (1 << WGM21);  // Configuración del Timer 2 en modo CTC
+	TCCR2B = (1 << CS22);   // Prescaler de 256
+	OCR2A = 4;             // Valor de comparación para contar hasta 4
+	TIMSK2 = (1 << OCIE2A); // Habilitar la interrupción de comparación A
+	
 	set_origen();
 }
 
 
-void getAnguloEncoder(int16_t *anguloOUT, uint32_t *tiempoMuestraOUT){
+void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 	*anguloOUT = angulo;
 	if(tiempoMuestraOUT!=0){
-		*tiempoMuestraOUT = tiempoMuestra;
+		//*tiempoMuestraOUT = tiempoMuestra;
+		int16_t axi = (derivate_D + derivate_I)/2;
+		//puedo hacer que duvuelva el mismo y que no cambie
+		if (axi != axiAnt)
+		{
+			*tiempoMuestraOUT = anguloANt * axi;
+			axiAnt = (derivate_D + derivate_I)/2;
+		}else{
+			*tiempoMuestraOUT = anguloANt * derivate_counter_D;
+		}
 	}
 }
 
@@ -88,58 +116,75 @@ void set_origen(){
 //se toma el tiempo para saber cuando ocurrio la toma del dato
 ISR(INT1_vect){ //interrupción periódica de periodo Tisr=40/2MHz=20us  o fisr=2MHz/40=500kHz
 	//	leer entradas
+	derivate_I = derivate_counter_I;
+	derivate_counter_I = 0;
 	IZQ = LEERIZQ;
 	DER = LEERDER;
-	tiempoMuestra = tiempoSEOS;
+	//tiempoMuestra = tiempoSEOS;
 	(*MEF[estado])(); //ejecuta la funcion correspondiente
 }
 
 //sensor derecho
 ISR(INT0_vect){
 	//leer entradas
+	derivate_D = derivate_counter_D;
+	derivate_counter_D = 0;
 	IZQ = LEERIZQ;
 	DER = LEERDER;
-	tiempoMuestra = tiempoSEOS;
+	//tiempoMuestra = tiempoSEOS;
 	(*MEF[estado])(); //ejecuta la funcion correspondiente
 }
 
 void f00(void){
 	if(DER){
 		angulo--;
+		anguloANt=-1;
 		estado = CeroUno;
 	}
 	if (IZQ){
 		angulo++;
+		anguloANt=1;
 		estado = UnoCero;
 	}
 }
 void f10(void){
 	if(DER){
 		angulo++;
+		anguloANt=1;
 		estado = UnoUno;
 	}
 	if(!IZQ){
 		angulo--;
+		anguloANt=-1;
 		estado = CeroCero;
 	}
 }
 void f01(void){
 	if(!DER){
 		angulo++;
+		anguloANt=1;
 		estado = CeroCero;
 	}
 	if(IZQ){
 		angulo--;
+		anguloANt=-1;
 		estado = UnoUno;
 	}
 }
 void f11(void){
 	if(!DER){
 		angulo--;
+		anguloANt=-1;
 		estado = UnoCero;
 	}
 	if(!IZQ){
 		angulo++;
+		anguloANt=1;
 		estado = CeroUno;
 	}
+}
+
+ISR(TIMER2_COMPA_vect) {
+	derivate_counter_D++;
+	derivate_counter_I++;
 }
