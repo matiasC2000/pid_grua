@@ -25,8 +25,8 @@
 #define LEERDER PIND & (1<<PORTD2)
 
 int16_t static volatile angulo = 0,derivate_counter_D=0,derivate_counter_I=0;
-int16_t static anguloANt=0;
-uint8_t static volatile IZQ=0,DER=0;
+int16_t static anguloANt=0,signoAnt=0;
+uint8_t static volatile IZQ=0,DER=0, count_equals=0;
 uint32_t static volatile tiempoMuestra =0;
 
 int16_t static derivate_D=0,derivate_I=0,axiAnt;
@@ -89,13 +89,21 @@ void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 		//*tiempoMuestraOUT = tiempoMuestra;
 		int16_t axi = (derivate_D + derivate_I)/2;
 		//puedo hacer que duvuelva el mismo y que no cambie
-		if (axi != axiAnt)
-		{
-			*tiempoMuestraOUT = anguloANt * axi;
+		
+		//*tiempoMuestraOUT = anguloANt * axi;
+		if(anguloANt == signoAnt){
+		if(axiAnt != axi){
 			axiAnt = (derivate_D + derivate_I)/2;
+			*tiempoMuestraOUT = anguloANt * axiAnt;
+			count_equals=0;
 		}else{
-			*tiempoMuestraOUT = anguloANt * derivate_counter_D;
+			*tiempoMuestraOUT = anguloANt*((derivate_D + derivate_I)/2+derivate_counter_D/5);
+			//*tiempoMuestraOUT = anguloANt * ((derivate_D + derivate_I)/2+(derivate_counter_D+derivate_counter_I)/2)/2;
 		}
+		}else{
+			*tiempoMuestraOUT = 16000;
+		}
+		signoAnt= anguloANt;
 	}
 }
 
@@ -185,6 +193,8 @@ void f11(void){
 }
 
 ISR(TIMER2_COMPA_vect) {
-	derivate_counter_D++;
-	derivate_counter_I++;
+// 	derivate_counter_D=derivate_counter_D+derivate_counter_D==32000;
+// 	derivate_counter_I=derivate_counter_I+derivate_counter_I==32000;
+	if(derivate_counter_D!=3200)derivate_counter_D++;
+	if(derivate_counter_I!=3200)derivate_counter_I++;
 }

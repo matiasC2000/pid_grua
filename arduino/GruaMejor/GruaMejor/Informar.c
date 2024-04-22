@@ -43,7 +43,7 @@ void Informar_Actulizar(){
 		}
 	}
 	if(FLAGmandarDatos){
-		Descomponeruint32(getTiempoSEOS(),tiempo);
+		Descomponeruint32(getTiempoInforme(),tiempo);
 		UART_TransmitString(tiempo,10);
 		UART_TransmitChar(';');
 		Descomponerint16(getValor(),error);

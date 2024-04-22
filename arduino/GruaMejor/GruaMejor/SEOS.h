@@ -19,5 +19,6 @@ void SEOS_SCH_Tasks(void);
 void SEOS_Dispatch_Tasks(void);
 void SEOS_Init(void);
 uint32_t getTiempoSEOS();
+uint32_t getTiempoInforme();
 
 #endif /* SEOS_H_ */
