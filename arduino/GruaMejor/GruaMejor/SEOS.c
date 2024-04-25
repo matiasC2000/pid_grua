@@ -41,11 +41,11 @@ void SEOS_SCH_Tasks (void)
 	  llamo a las tareas que tengo que hacer
 	*/
 	if (++contPID==2) {
-		Flag_PID=1;				//Tarea programada cada 3ms
+		Flag_PID=1;				//Tarea programada cada 1ms
 		contPID=0;
 	}
 	if (++contInformo==10*MULTIPLICADOR_MS) {
-		Flag_Informo=1;			//Tarea programada cada 3 ms
+		Flag_Informo=1;			//Tarea programada cada 10 ms
 		contInformo=0;
 	}	if (++contButtton==5*MULTIPLICADOR_MS) {
 		Flag_Button=1;			//Tarea programada cada 5 ms

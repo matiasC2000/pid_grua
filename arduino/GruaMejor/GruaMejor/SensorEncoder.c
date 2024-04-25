@@ -82,6 +82,9 @@ void SensorEncoder_init(){
 	set_origen();
 }
 
+//puede ser que tenga que agragar aca a un vector circular
+//y pasar el vector circular y filtrarlo en el PID
+//puede que le lleve much procesamiento y se haga muy lento porque lo tengoque hacer en la maquina de estado
 
 void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 	*anguloOUT = angulo;
@@ -92,14 +95,14 @@ void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 		
 		//*tiempoMuestraOUT = anguloANt * axi;
 		if(anguloANt == signoAnt){
-		if(axiAnt != axi){
-			axiAnt = (derivate_D + derivate_I)/2;
-			*tiempoMuestraOUT = anguloANt * axiAnt;
-			count_equals=0;
-		}else{
-			*tiempoMuestraOUT = anguloANt*((derivate_D + derivate_I)/2+derivate_counter_D/5);
-			//*tiempoMuestraOUT = anguloANt * ((derivate_D + derivate_I)/2+(derivate_counter_D+derivate_counter_I)/2)/2;
-		}
+			if(axiAnt != axi){
+				axiAnt = (derivate_D + derivate_I)/2;
+				*tiempoMuestraOUT = anguloANt * axiAnt;
+				count_equals=0;
+			}else{
+				*tiempoMuestraOUT = anguloANt*((derivate_D + derivate_I)/2+derivate_counter_D/5);
+				//*tiempoMuestraOUT = anguloANt * ((derivate_D + derivate_I)/2+(derivate_counter_D+derivate_counter_I)/2)/2;
+			}
 		}else{
 			*tiempoMuestraOUT = 16000;
 		}

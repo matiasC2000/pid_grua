@@ -144,7 +144,8 @@ void calcularDerivada(int16_t e){
 	derivada = 0.7 * derivadas[0]+ 0.15 * derivadas[1] + 0.15 * derivadas[2];
 	posAnt[0]=e;*/
 	
-	derivada = (float)tiempoMuestra;
+	derivada = (float)5000/tiempoMuestra;
+	
 	
 	/*i_derivative = (i_derivative+1)%CANT_DERIVATE;
 	derivadas[i_derivative] = (float)(tiempoMuestra);
@@ -253,7 +254,7 @@ float ec_basico(){
 	calcularDerivada(e);
 	calcularIntegral(e);
 	
-	return( (multi*Kp)*e + Kd*5000/derivada + Ki*s);
+	return( (multi*Kp)*e + Kd*derivada + Ki*s);
 }
 
 float ec_sin_sen(){	

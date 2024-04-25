@@ -12,6 +12,18 @@ from abc import ABC, abstractmethod
 import threading
 import serial as sr
 
+def hex_to_int(hex_str):
+    """
+    Convierte un número hexadecimal en complemento a 2 a un entero.
+    Args:
+        hex_str (str): El número hexadecimal en complemento a 2.
+    Returns:
+        int: El valor entero correspondiente.
+    """
+    num_bytes = bytes.fromhex(hex_str)  # Convertir el hexadecimal a bytes
+    int_value = int.from_bytes(num_bytes, byteorder='big', signed=True)  # Convertir los bytes a entero
+    return int_value
+
 class GeneradorDatos(ABC):
     def __init__(self):
         self.array = []
@@ -109,28 +121,38 @@ class GeneradorArduino(GeneradorDatos):
             a=""
         self.a = a
 
+
     def actualizar_datos(self):
         if self.a != "":
             self.a = self.a.replace('\n',';')
         data_values = self.a.split(';')
         if len(data_values) == 6: #lleva un mas por uno que se agrega al final
-            if data_values[0].isdigit() and data_values[1].lstrip('-').isdigit() and data_values[2].lstrip('-').lstrip('-').isdigit() and data_values[3].lstrip('-').isdigit() and data_values[4].lstrip('-').isdigit():
-                self.t_values.append(int(data_values[0][0:])/1000)
-                if not data_values[1][0:] == self.e_values[-1]:
-                    self.e_values.append(int(data_values[1][0:]))
-                self.i_values.append(int(data_values[2][0:]))
-                if int(data_values[3][0:]) != 0:
-                    self.d_values.append(5000/int(data_values[3][0:]))
+            try:
+                
+                axit = hex_to_int(data_values[0][0:])/1000
+                axie = hex_to_int(data_values[1][0:])
+                axii = hex_to_int(data_values[2][0:])
+                axid = hex_to_int(data_values[3][0:])
+                axiset = hex_to_int(data_values[4][0:])
+                # Intenta convertir la cadena a un número entero en hexadecimal
+                self.t_values.append(axit)
+                self.e_values.append(axie)
+                self.i_values.append(axii)
+                if axid != 0:
+                    self.d_values.append(axid)
                 else:
                     self.d_values.append(5000)
                 if self.ecuacion != 2:
                     self.set_values.append(0)
                 else:
-                    self.set_values.append(int(data_values[4][0:]))
+                    self.set_values.append(axiset)
                 #print(t_values[-1],e_values[-1],set_values[-1])
                 self.datoNuevoEnviar = True
-        else:
-            print("Arduino: "+self.a)
+            
+            except ValueError:
+                print("Arduino: "+self.a)
+            # Si no se puede convertir a un número en hexadecimal, devuelve False
+            
         while(self.t_values[-1] - self.t_values[0] > tiempoEnArreglo):
             del self.t_values[0]
             del self.e_values[0]

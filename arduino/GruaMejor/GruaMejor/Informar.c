@@ -20,7 +20,11 @@ void customStrcat(char *dest, const char *src);
 void Descomponeruint32(uint32_t numero,char *str);
 void Descomponerint16(int16_t numero,char *str);
 void Descomponeruint16(uint16_t numero,char *str);
+void Descomponeruint32aHex(uint32_t numero,char *str);
+void Descomponerint16aHex(int16_t numero,char *str);
+void Descomponeruint16aHex(uint16_t numero,char *str);
 uint8_t FLAGmandarDatos=0;
+char num_16[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9','A', 'B', 'C', 'D', 'E', 'F'};
 
 void Informar_MensajeInicial(){
 	//UART_TransmitString("hola soy la grua\n",1);
@@ -43,24 +47,24 @@ void Informar_Actulizar(){
 		}
 	}
 	if(FLAGmandarDatos){
-		Descomponeruint32(getTiempoInforme(),tiempo);
+		Descomponeruint32aHex(getTiempoInforme(),tiempo);
 		UART_TransmitString(tiempo,10);
 		UART_TransmitChar(';');
-		Descomponerint16(getValor(),error);
+		Descomponerint16aHex(getValor(),error);
 		UART_TransmitString(error,7);
 // 		getAnguloEncoder(&valorAngulo,0);
 // 		Descomponerint16(valorAngulo,angulo);
 // 		UART_TransmitString(angulo,7);
 		UART_TransmitChar(';');
-		Descomponerint16(getIntegralPID(),integral); // Convierte a base decimal (10)
+		Descomponerint16aHex(getIntegralPID(),integral); // Convierte a base decimal (10)
 		UART_TransmitString(integral,7);
 // 		Descomponerint16(getVelocidadPID(),velocidad); // Convierte a base decimal (10)
 // 		UART_TransmitString(velocidad,7);
 		UART_TransmitChar(';');
-		Descomponerint16(getDerivadaPID(),derivada); // Convierte a base decimal (10)
+		Descomponerint16aHex((int16_t)getDerivadaPID(),derivada); // Convierte a base decimal (10)
 		UART_TransmitString(derivada,7);
 		UART_TransmitChar(';');
-		Descomponerint16(getSlideResistor()*13.3,error);
+		Descomponerint16aHex(getSlideResistor()*13.3,error);
 		UART_TransmitString(error,7);
 		UART_TransmitChar('\n');
 	}
@@ -96,9 +100,49 @@ void Descomponeruint32(uint32_t numero, char *str)
 	*(str) = '\0';
 }
 
+void Descomponeruint16aHex(uint16_t numero,char *str){
+    uint16_t mascara = 0xF000; // Máscara para el bit más significativo
+    int16_t axi=0;
+    uint8_t i;
+    for(i = 0; i < 4; i++) {
+	    axi = (numero & mascara);
+	    axi = axi >> (12 - i*4); // Cambiar el desplazamiento
+	    *(str) = num_16[axi];
+	    mascara = mascara >> 4; // Cambiar la máscara
+	    str++;
+    }
+    *(str) = '\0';
+}
+
+void Descomponerint16aHex(int16_t numero, char *str)
+{
+    uint16_t mascara = 0xF000; // Máscara para el bit más significativo
+    int16_t axi=0;
+    uint8_t i;
+    for(i = 0; i < 4; i++) {
+	    axi = (numero & mascara);
+	    axi = (uint16_t)((uint16_t)axi >> (12 - i*4));; // Cambiar el desplazamiento
+	    *(str) = num_16[axi];
+	    mascara = mascara >> 4; // Cambiar la máscara
+	    str++;
+    }
+    *(str) = '\0';
+}
+
+void Descomponeruint32aHex(uint32_t numero, char *str){
+    uint32_t mascara = 0xF0000000; // Máscara para el bit más alto
+    uint8_t i;
+    for (i = 0; i < 8; i++) {
+	    *(str++) = num_16[(numero & mascara) >> (28 - i * 4)]; // Se ajusta la posición del bit
+	    mascara >>= 4; // Se desplaza la máscara hacia la derecha
+    }
+    *str = '\0'; // Se agrega el terminador de cadena
+}
+
+
 void Descomponeruint16(uint16_t numero,char *str){
 	if(numero!=0){
-		uint32_t div= 10000;
+		uint16_t div= 10000;
 		while(numero/div == 0){
 			div = div/10;
 		}
