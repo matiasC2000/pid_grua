@@ -198,6 +198,6 @@ void f11(void){
 ISR(TIMER2_COMPA_vect) {
 // 	derivate_counter_D=derivate_counter_D+derivate_counter_D==32000;
 // 	derivate_counter_I=derivate_counter_I+derivate_counter_I==32000;
-	if(derivate_counter_D!=3200)derivate_counter_D++;
-	if(derivate_counter_I!=3200)derivate_counter_I++;
+	if(derivate_counter_D!=32000)derivate_counter_D++;
+	if(derivate_counter_I!=32000)derivate_counter_I++;
 }

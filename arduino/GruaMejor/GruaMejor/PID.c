@@ -144,7 +144,7 @@ void calcularDerivada(int16_t e){
 	derivada = 0.7 * derivadas[0]+ 0.15 * derivadas[1] + 0.15 * derivadas[2];
 	posAnt[0]=e;*/
 	
-	derivada = (float)5000/tiempoMuestra;
+	derivada = (float)(0.02)*(float)30000/(float)tiempoMuestra+(float)(0.98)*derivada;
 	
 	
 	/*i_derivative = (i_derivative+1)%CANT_DERIVATE;

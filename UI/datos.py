@@ -138,10 +138,7 @@ class GeneradorArduino(GeneradorDatos):
                 self.t_values.append(axit)
                 self.e_values.append(axie)
                 self.i_values.append(axii)
-                if axid != 0:
-                    self.d_values.append(axid)
-                else:
-                    self.d_values.append(5000)
+                self.d_values.append(axid)
                 if self.ecuacion != 2:
                     self.set_values.append(0)
                 else:
