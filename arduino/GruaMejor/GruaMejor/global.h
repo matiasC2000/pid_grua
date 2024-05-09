@@ -7,4 +7,4 @@
 
 extern uint8_t FLAG_button_A;
 extern uint8_t FLAG_button_B;
-extern uint8_t FLAG_button_A_change;
+extern uint8_t FLAG_button_A_change,FLAG_button_B_change;

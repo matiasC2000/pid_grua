@@ -24,12 +24,10 @@
 #define LEERIZQ PIND & (1<<PORTD3)
 #define LEERDER PIND & (1<<PORTD2)
 
-int16_t static volatile angulo = 0,derivate_counter_D=0,derivate_counter_I=0;
-int16_t static anguloANt=0,signoAnt=0;
+int16_t static volatile angulo = 0,derivate_counter_D=0,derivate_counter_I=0,derivate_D=0,derivate_I=0,axiAnt;
+int16_t static anguloANt=1,signoAnt=1;
 uint8_t static volatile IZQ=0,DER=0, count_equals=0;
 uint32_t static volatile tiempoMuestra =0;
-
-int16_t static derivate_D=0,derivate_I=0,axiAnt;
 
 typedef enum {CeroCero,UnoCero,CeroUno,UnoUno} state;
 state static volatile estado;
@@ -89,24 +87,13 @@ void SensorEncoder_init(){
 void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 	*anguloOUT = angulo;
 	if(tiempoMuestraOUT!=0){
-		//*tiempoMuestraOUT = tiempoMuestra;
-		int16_t axi = (derivate_D + derivate_I)/2;
-		//puedo hacer que duvuelva el mismo y que no cambie
+		*tiempoMuestraOUT =anguloANt*(derivate_D + derivate_I)/2;
 		
-		//*tiempoMuestraOUT = anguloANt * axi;
-		if(anguloANt == signoAnt){
-			if(axiAnt != axi){
-				axiAnt = (derivate_D + derivate_I)/2;
-				*tiempoMuestraOUT = anguloANt * axiAnt;
-				count_equals=0;
-			}else{
-				*tiempoMuestraOUT = anguloANt*((derivate_D + derivate_I)/2+derivate_counter_D/5);
-				//*tiempoMuestraOUT = anguloANt * ((derivate_D + derivate_I)/2+(derivate_counter_D+derivate_counter_I)/2)/2;
-			}
-		}else{
-			*tiempoMuestraOUT = 16000;
+		if(*tiempoMuestraOUT == axiAnt){
+			*tiempoMuestraOUT = anguloANt*(derivate_D + derivate_I)/2+ anguloANt*derivate_counter_D/2;
 		}
 		signoAnt= anguloANt;
+		axiAnt= *tiempoMuestraOUT;
 	}
 }
 

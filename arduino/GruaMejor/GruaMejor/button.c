@@ -7,10 +7,10 @@
 #include <avr/io.h>
 #include "global.h"
 
-uint8_t static contAON=0,contAOFF=0,contB=0;
+uint8_t static contAON=0,contAOFF=0,contB=0,contBOFF=0,contBON=0;
 uint8_t FLAG_button_A = 0;
 uint8_t FLAG_button_B = 0;
-uint8_t FLAG_button_A_change=0;
+uint8_t FLAG_button_A_change=0,FLAG_button_B_change=0;
 
 void button_init(){
 	DDRD &= ~(1<<PORTD7); //pongo D7 como entrada
@@ -41,10 +41,21 @@ void button_Actulizar(){
 		}
 	}
 	if(! (PINB & (1<<PORTB0))){
-		if(++contB>10){
+		//apretado
+		contBOFF=0;
+		if(++contB>15){
 			FLAG_button_B=1;
+			contBON=100;
 		}
 	}else{
-		contB=0;
+		//lo solto
+		contBON=0;
+		if(++contBOFF>15){
+			FLAG_button_B=0;
+			contBOFF=100;
+		}
+		if(contBOFF==13){
+			FLAG_button_B_change=1;
+		}
 	}
 }

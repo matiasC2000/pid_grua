@@ -33,9 +33,9 @@ int main(void)
 	
 	//_delay_ms(50);
 	Informar_MensajeInicial();
-	/*
+	
 	setVelocidad(0);
-	buscarOrigen();
+	/*buscarOrigen();
 	
 	irPos(7000);
 	

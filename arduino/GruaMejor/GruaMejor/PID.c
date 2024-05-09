@@ -20,11 +20,9 @@
 #define ZONAMUERTA 0
 #define ZONAMUERTAI 10000
 
-#define LIMITESUPI 10000000
+//#define LIMITESUPI 5000
 
 //ki 4 Kp-170
-
-int16_t static eant = 0;
 
 //Para derivada y posRef
 //float static Kd = 6/700,Kp = 3, Ki=0;
@@ -42,12 +40,16 @@ float static Kd = 0,Kp = 0.1, Ki=0;
 //quieto en un punto y hace pendulo
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 
-uint8_t FLAG_habilitar_PID=1,i_derivative=0,cambio=1;
-float static vel, s = 0,posRef, derivada=0,derivadaAnt=0;
+uint8_t FLAG_habilitar_PID=1,i_derivative=0,cambio=1,FLAG_habilitar_manual=1;
+float static vel,velAnt=0, s = 0,posRef, derivada=0,derivada_encoder=0,derivada_angulo=0,derivada_pos=0,derivadaAnt=0;
 float derivadas[CANT_DERIVATE];
-int16_t static e,tiempoDev,valor;
+float LIMITESUPI=0;
+float tiempoMuestraSoft=32000;
+int16_t static e,tiempoDev,valor, eant = 0;;
 int16_t static tiempoMuestra=0;
 uint8_t vecesIgual=1,indice_ec_error = 0;
+int16_t puntosAngulo;
+int8_t direccion=0;
 
 enum Indices_ec {
 	EC_BASICO,
@@ -65,7 +67,10 @@ int16_t sen2[]={0,7,15,23,31,39,47,54,62,70,78,86,94,101,109,117,125,133,140,148
 // 0.45      0.90      1.35		1.8		 2.25	  2.7	  3.15	   3.6		4.05	 4.5
 // 0.007853  0.015707  0.023559	0.031410 0.039259 0.04710 0.054950 0.062790 0.070626 0.078459                           0.078459     
 
-void calcularDerivada(int16_t);
+void calcularDerivada_encoder();
+void calcularDerivada_angulo(int16_t);
+void calcularDerivada_pos(int16_t);
+
 void calcularIntegral(int16_t);
 
 float ec_basico();
@@ -92,14 +97,41 @@ void Actulizar_PID(){
 		FLAG_button_A_change=0;
 	}
 	
+	if (FLAG_button_B_change)
+	{
+		if(FLAG_habilitar_manual){
+			FLAG_habilitar_manual = 0;
+			}else{
+			FLAG_habilitar_manual = 1;
+		}
+		FLAG_button_B_change=0;
+	}
+	
 	if(FLAG_habilitar_PID){
-		if(vel>1000) vel=1000;
-		if(vel<-1000) vel=-1000;
 		ONLEDGREEN;
 	}else{
 		vel = 0;
 		OFFLEDGREEN;
 	}
+	//	vel = getSlideResistor()*13.3-getPos();
+	
+	
+	// no me gusta este pedazo de codigo
+	//tengo que poner un limite de acceleracion al codigo para que no patine el motor el motor
+	float velMax = vel*0.30;
+	
+	if (velMax>1700)
+	{
+		velMax = 1700;
+	}
+	if (velMax<-1700)
+	{
+		velMax = -1700;
+	}
+	
+	if(vel>velMax) vel=velMax;
+	if(vel<velMax) vel=velMax;
+	
 	setVelocidad(vel);
 }
 
@@ -133,7 +165,8 @@ void calcularIntegral(int16_t e){
 	if(s < -LIMITESUPI) s = -LIMITESUPI;
 }
 
-void calcularDerivada(int16_t e){
+
+void calcularDerivada_encoder(){
 	/*
 	//tambien quiero esto
 	//puedo ser que cuando no esta calculando porque no entro al if poner una suvisacion con un calculo actual
@@ -144,7 +177,11 @@ void calcularDerivada(int16_t e){
 	derivada = 0.7 * derivadas[0]+ 0.15 * derivadas[1] + 0.15 * derivadas[2];
 	posAnt[0]=e;*/
 	
-	derivada = (float)(0.02)*(float)30000/(float)tiempoMuestra+(float)(0.98)*derivada;
+	//tiempoMuestraSoft = (float)(0.02)*tiempoMuestra+(float)(0.98)*tiempoMuestraSoft;
+	
+	//axiAngulo = e-calcularSen(puntosAngulo+direccion)*100;
+	derivada_encoder = (20000/tiempoMuestra)*0.02+derivada_encoder*0.98;
+	//derivada_angulo = derivada_angulo*0.98+20000/tiempoMuestra*0.02;
 	
 	
 	/*i_derivative = (i_derivative+1)%CANT_DERIVATE;
@@ -206,6 +243,7 @@ void calcularDerivada(int16_t e){
 }
 
 void setKi(float val){
+	LIMITESUPI = 1700/val;
 	Ki=val;
 }
 void setKd(float val){
@@ -240,8 +278,14 @@ int16_t calcularSen(int16_t sen){
 	return sen;
 }
 
+void calcularDerivada_angulo(int16_t e){
+	calcularDerivada_encoder();
+	derivada_angulo = calcularSen(e+200)*(derivada_encoder/1000);
+}
+
 float ec_basico(){
 	int8_t multi=1;
+	puntosAngulo = e;
 	e = e % 800;
 	if(e<0){
 		e = 800+e;
@@ -251,8 +295,9 @@ float ec_basico(){
 	}
 	e=calcularSen(e);
 	valor = e;
-	calcularDerivada(e);
+	calcularDerivada_angulo(puntosAngulo);
 	calcularIntegral(e);
+	derivada = derivada_angulo;
 	
 	return( (multi*Kp)*e + Kd*derivada + Ki*s);
 }
@@ -263,14 +308,27 @@ float ec_sin_sen(){
 	e= e;//%800;
 	valor = e;
 	
-	calcularDerivada(e);
+	calcularDerivada_encoder(e);
 	calcularIntegral(e);
+	derivada = derivada_encoder;
 	
 	return( Kp*e + Kd*derivada + Ki*s);
 }
 
+void calcularDerivada_pos(int16_t e){
+	//antes de esto hacer lo de mandar mensajes
+	//falta poner que cos(a)*derivada del angulo - vel
+	//con eso tendria que andar 10 puntos
+	calcularDerivada_angulo(e);
+	derivada = vel+derivada_angulo;
+	//int16_t calculoAxi = e - eant;
+	//eant = e;
+	//derivada = (float)(0.02)*(float)calculoAxi+(float)(0.98)*derivada;
+}
+
 
 float ec_pos(){
+	puntosAngulo = e;
 	e=calcularSen(e);
 	
 	//el palo mide 6500 pasos de la grua
@@ -284,11 +342,12 @@ float ec_pos(){
 	posRef = getSlideResistor()*13.3;
 	
 	//Para derivada y posRef
-	e = e*6.5;
+	e = e*6.5;	//el lagro es: 20
 	valor = getPos()+e;
 	// y el error para la derivada es sin el posRef y capaz un cambio de signo
 	
-	calcularDerivada(e-getPos());
+	
+	calcularDerivada_pos(puntosAngulo);		//por ahora dejo fuera la pos
 	
 	//Para derivada y posRef
 	e = posRef-getPos()+e;		//e = posRef-getPos()+e*6.5; lo hago por partes
@@ -296,6 +355,8 @@ float ec_pos(){
 	//quieto en un punto y para que suba
 	//posRef = 7000;
 	//e = posRef-getPos()-e;
+	
+	derivada = derivada_pos;
 	
 	calcularIntegral(e);
 	return( Kp*e + Kd*derivada + Ki*s );
