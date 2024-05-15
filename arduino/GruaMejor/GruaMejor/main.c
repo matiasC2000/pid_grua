@@ -35,8 +35,8 @@ int main(void)
 	Informar_MensajeInicial();
 	
 	setVelocidad(0);
-	/*buscarOrigen();
-	
+	buscarOrigen();
+	/*
 	irPos(7000);
 	
 	ONLEDGREEN;
@@ -64,9 +64,26 @@ int main(void)
 	irPos(7000+16*5);
 	*/
 	SEOS_Init();
+	
+	
+	uint32_t inicio;
+	uint8_t flag = 0;
 	while (1) 
     {
 		//llama a la maquina de estados para inciar el control
 		SEOS_Dispatch_Tasks();
+		if (getPos() < 100){
+			UART_TransmitChar('a');
+			inicio = getTiempoSEOS();
+			flag = 1;			
+		}
+		if (getPos() > 12000 && flag)
+		{
+			flag = 0;
+			UART_TransmitChar('b');
+			char tiempo[10];
+			Descomponeruint32(getTiempoSEOS()-inicio,tiempo);	
+			UART_TransmitString(tiempo,10);
+		}
     }
 }

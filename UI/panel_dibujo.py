@@ -63,7 +63,6 @@ class PanelDibujo():
                 if self.valor_ecuacion[2]:
                     self.ax.plot(t_values[0:-1],set_values[0:-1], color="green")
             else:
-                #print(datax[-1],datay[-1])
                 self.ax.plot(t_values[0:],e_values[0:], color="blue")
                 if self.valor_ecuacion[2]:
                     self.ax.plot(t_values[0:-1],set_values[0:-1], color="green")

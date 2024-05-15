@@ -46,8 +46,11 @@ void Informar_Actulizar(){
 			FLAGmandarDatos=0;
 		}
 	}
+	//la lectura de las variables tiene que ser en un unico momento
+	//if momento == 0
+	// guardar todos los datos
 	if(FLAGmandarDatos){
-		Descomponeruint32aHex(getTiempoInforme(),tiempo);
+		/*Descomponeruint32aHex(getTiempoInforme(),tiempo);
 		UART_TransmitString(tiempo,10);
 		UART_TransmitChar(';');
 		Descomponerint16aHex(getValor(),error);
@@ -66,9 +69,14 @@ void Informar_Actulizar(){
 		UART_TransmitChar(';');
 		Descomponerint16aHex(getSlideResistor()*13.3,error);
 		UART_TransmitString(error,7);
-		UART_TransmitChar('\n');
+		UART_TransmitChar('\n');*/
 	}
 }
+
+//void guardar todos los datos
+/*
+var_tiempo = getTiempoInforme()
+*/
 
 /*
 	char numeroStr[7];

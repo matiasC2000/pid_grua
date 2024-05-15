@@ -26,7 +26,7 @@
 
 //Para derivada y posRef
 //float static Kd = 6/700,Kp = 3, Ki=0;
-float static Kd = 0,Kp = 0.1, Ki=0;
+float static Kd = 0,Kp = 1, Ki=0;
 //Para posRef solo Kp
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 //Para derivada, integlal y posRef
@@ -47,7 +47,7 @@ float LIMITESUPI=0;
 float tiempoMuestraSoft=32000;
 int16_t static e,tiempoDev,valor, eant = 0;;
 int16_t static tiempoMuestra=0;
-uint8_t vecesIgual=1,indice_ec_error = 0;
+uint8_t vecesIgual=1,indice_ec_error = 2;
 int16_t puntosAngulo;
 int8_t direccion=0;
 
@@ -281,6 +281,8 @@ int16_t calcularSen(int16_t sen){
 void calcularDerivada_angulo(int16_t e){
 	calcularDerivada_encoder();
 	derivada_angulo = calcularSen(e+200)*(derivada_encoder/1000);
+	//la derivada de la posicion tiene que ser
+	//calcularSen(e+200)*0.00255*(derivada_encoder/1000);
 }
 
 float ec_basico(){
@@ -320,7 +322,8 @@ void calcularDerivada_pos(int16_t e){
 	//falta poner que cos(a)*derivada del angulo - vel
 	//con eso tendria que andar 10 puntos
 	calcularDerivada_angulo(e);
-	derivada = vel+derivada_angulo;
+	//vel + derivada_angulo*6.5;
+	derivada_pos = derivada_angulo + vel*(8.0645);
 	//int16_t calculoAxi = e - eant;
 	//eant = e;
 	//derivada = (float)(0.02)*(float)calculoAxi+(float)(0.98)*derivada;

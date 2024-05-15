@@ -75,33 +75,37 @@ void setVelocidad(int16_t velocidad){
 		}
 		ladoAnt=1;
 		}
+		
+	espera = 31000/velocidad;	//era 1875
+	salto=1;PASOS1;// el paso no tendria que poner siempre en 1 los otros tienen que dejar en 1
 	 
-		if(velocidad>500){
-			espera = 31000/velocidad;
-			salto=16;PASOS16;
-		}
-		else {
-			if(velocidad>250){
-				espera = 15000/velocidad;
-				salto=8;PASOS8;
-			}else{
-				if (velocidad>125)
-				{
-					espera = 7500/velocidad;
-					salto=4;PASOS4;
-				}else{
-					if(velocidad>63){
-						espera = 3750/velocidad;
-						salto=2;PASOS2;
-					}else{
-						espera = 1875/velocidad;
-						salto=1;PASOS1;
-					}
-				}
-			}
-			
-		}
+// 		if(velocidad>500){
+// 			espera = 31000/velocidad;
+// 			salto=16;PASOS16;
+// 		}
+// 		else {
+// 			if(velocidad>250){
+// 				espera = 15500/velocidad;	//15000
+// 				salto=8;PASOS8;
+// 			}else{
+// 				if (velocidad>125)
+// 				{
+// 					espera = 7550/velocidad;	//7500
+// 					salto=4;PASOS4;
+// 				}else{
+// 					if(velocidad>63){
+// 						espera = 3875/velocidad;	//3750
+// 						salto=2;PASOS2;
+// 					}else{
+// 						espera = 1937/velocidad;	//era 1875
+// 						salto=1;PASOS1;
+// 					}
+// 				}
+// 			}
+// 			
+// 		}
 	}
+	
 	//el tiempo de espera minimo esta 33 pero se puede mas hacer pruebas
 	//velocidad maxima de 1000
 	//tiempo espera = 33000/velociadad
@@ -127,11 +131,14 @@ void Inicializacion_Motor(){
 	//borrar viejo DDRC |= (1<<PORTC0)|(1<<PORTC1)|(1<<PORTC2);
 	
 	TCCR1A =  0;
-	TCCR1B = (1<<WGM12)|(1<<CS12)|(1<<CS10); //modo CTC y preescaler de 1024
+	//TCCR1B = (1<<WGM12)|(1<<CS12)|(1<<CS10); //modo CTC y preescaler de 1024
+	
+	TCCR1B = (1<<WGM12)|(1<<CS11)|(1<<CS10); //el que tengo que modificar modo CTC y preescaler de 64
+	
 	TIFR1 = (1<<OCF1B)|(1<<OCF1A);
 	
 	//timer
-	OCR1B = 16;			//16+1
+	OCR1B = 1;			//tenia16+1
 	OCR1A = 6000;			//32+1 velocidad maxima
 	
 	 // Habilitar interrupciones
@@ -231,25 +238,5 @@ ISR(TIMER1_COMPB_vect){ //interrupción periódica de periodo Tisr=40/2MHz=20us  o
 	if(lado==-1){
 		IRIZQ;
 	}
-// 	switch (salto) {
-// 		case 16:
-// 			PASOS16;
-// 		break;
-// 		case 8:
-// 			PASOS8;
-// 		break;
-// 		case 4:
-// 			PASOS4;
-// 		break;
-// 		case 2:
-// 			PASOS2;
-// 		break;
-// 		case 1:
-// 			PASOS1;
-// 		break;
-// 		default:
-// 		// Manejar el caso por defecto, si es necesario
-// 		break;
-// 	}
 }
 
