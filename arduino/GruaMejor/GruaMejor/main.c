@@ -36,7 +36,7 @@ int main(void)
 	
 	setVelocidad(0);
 	buscarOrigen();
-	/*
+	
 	irPos(7000);
 	
 	ONLEDGREEN;
@@ -62,7 +62,7 @@ int main(void)
 	
 	//se mueve hacia un lado para inciar la oscilacion
 	irPos(7000+16*5);
-	*/
+	
 	SEOS_Init();
 	
 	
@@ -72,18 +72,5 @@ int main(void)
     {
 		//llama a la maquina de estados para inciar el control
 		SEOS_Dispatch_Tasks();
-		if (getPos() < 100){
-			UART_TransmitChar('a');
-			inicio = getTiempoSEOS();
-			flag = 1;			
-		}
-		if (getPos() > 12000 && flag)
-		{
-			flag = 0;
-			UART_TransmitChar('b');
-			char tiempo[10];
-			Descomponeruint32(getTiempoSEOS()-inicio,tiempo);	
-			UART_TransmitString(tiempo,10);
-		}
     }
 }

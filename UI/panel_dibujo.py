@@ -14,8 +14,8 @@ class PanelDibujo():
         self.nombres_ecuaciones=["Basico", "SinSeno", "Posición"]
 
         self.valores_ecuaciones = [
-            (-1000, 1000, False),
-            (-810, 810, False),
+            (-1000, 1000, False), #1000
+            (-2000, 2000, False),
             (-1000, 15000, True)        #buscar cuales son los valores
         ]
 
@@ -35,7 +35,7 @@ class PanelDibujo():
         self.ax.set_title("Error vs time")
         self.ax.set_xlabel("Time(Sec)")
         self.ax.set_ylabel("Error")
-        self.ax.set_xlim(-1,2)
+        self.ax.set_xlim(-0.5,5)  #self.ax.set_xlim(-1,2)
         self.ax.set_ylim(self.valor_ecuacion[0], self.valor_ecuacion[1])
         self.ax.minorticks_on()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plotting_frame)

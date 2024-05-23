@@ -5,7 +5,6 @@
 *  Author: Calvo
 */
 
-
 #include <avr/io.h>
 #include "PID.h"
 #include "UART.h"
@@ -14,13 +13,15 @@
 #include "SEOS.h"
 #include "slideResistor.h"
 #include "global.h"
+#include <math.h>
+
 
 #define CANT_DERIVATE 11
 
 #define ZONAMUERTA 0
 #define ZONAMUERTAI 10000
 
-//#define LIMITESUPI 5000
+#define LIMITESUPI 5000
 
 //ki 4 Kp-170
 
@@ -41,13 +42,14 @@ float static Kd = 0,Kp = 1, Ki=0;
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 
 uint8_t FLAG_habilitar_PID=1,i_derivative=0,cambio=1,FLAG_habilitar_manual=1;
+uint8_t estado=0,countStop=0,fueMayor100=0;
 float static vel,velAnt=0, s = 0,posRef, derivada=0,derivada_encoder=0,derivada_angulo=0,derivada_pos=0,derivadaAnt=0;
+uint16_t posRefManual;
 float derivadas[CANT_DERIVATE];
-float LIMITESUPI=0;
 float tiempoMuestraSoft=32000;
 int16_t static e,tiempoDev,valor, eant = 0;;
 int16_t static tiempoMuestra=0;
-uint8_t vecesIgual=1,indice_ec_error = 2;
+uint8_t vecesIgual=1,indice_ec_error = 0;
 int16_t puntosAngulo;
 int8_t direccion=0;
 
@@ -59,13 +61,14 @@ enum Indices_ec {
 };
 // Definición de tipos de funciones de error
 typedef float (*EcuacionesError)();
+typedef float (*State)();
 
 int16_t posAnt[2]={0,0};
 uint32_t static tAnt=0;
 uint32_t static tiempoAnt[2]={0,0};
 int16_t sen2[]={0,7,15,23,31,39,47,54,62,70,78,86,94,101,109,117,125,133,140,148,156,164,171,179,187,195,202,210,218,225,233,241,248,256,263,271,278,286,294,301,309,316,323,331,338,346,353,360,368,375,382,389,397,404,411,418,425,432,439,446,453,460,467,474,481,488,495,502,509,515,522,529,535,542,549,555,562,568,575,581,587,594,600,606,612,619,625,631,637,643,649,655,661,667,673,678,684,690,695,701,707,712,718,723,728,734,739,744,750,755,760,765,770,775,780,785,790,794,799,804,809,813,818,822,827,831,835,840,844,848,852,856,860,864,868,872,876,880,883,887,891,894,898,901,904,908,911,914,917,920,923,926,929,932,935,938,940,943,946,948,951,953,955,958,960,962,964,966,968,970,972,974,975,977,979,980,982,983,985,986,987,988,990,991,992,993,993,994,995,996,996,997,998,998,998,999,999,999,999,999,1000};
 // 0.45      0.90      1.35		1.8		 2.25	  2.7	  3.15	   3.6		4.05	 4.5
-// 0.007853  0.015707  0.023559	0.031410 0.039259 0.04710 0.054950 0.062790 0.070626 0.078459                           0.078459     
+// 0.007853  0.015707  0.023559	0.031410 0.039259 0.04710 0.054950 0.062790 0.070626 0.078459                           0.078459
 
 void calcularDerivada_encoder();
 void calcularDerivada_angulo(int16_t);
@@ -77,13 +80,15 @@ float ec_basico();
 float ec_sin_sen();
 float ec_pos();
 
+float levantar();
+float superArriba();
+float frenoAbajo();
+
+State stateBalance[] = {levantar,superArriba,frenoAbajo};
+
 EcuacionesError calcularError[] = {ec_basico,ec_sin_sen,ec_pos};
 
 void Actulizar_PID(){
-	getAnguloEncoder(&e,&tiempoMuestra);
-	
-	vel = calcularError[indice_ec_error]();
-	
 	//capar la velocidad para que no se derborde
 	//la velocidad maxima es de 1000
 	
@@ -91,46 +96,74 @@ void Actulizar_PID(){
 	{
 		if(FLAG_habilitar_PID){
 			FLAG_habilitar_PID = 0;
-		}else{
+			}else{
 			FLAG_habilitar_PID = 1;
 		}
 		FLAG_button_A_change=0;
 	}
 	
+
 	if (FLAG_button_B_change)
 	{
-		if(FLAG_habilitar_manual){
-			FLAG_habilitar_manual = 0;
-			}else{
-			FLAG_habilitar_manual = 1;
-		}
+		estado=0;
+		fueMayor100=0;
+
+		// 			if(FLAG_habilitar_manual){
+		// 				FLAG_habilitar_manual = 0;
+		// 			}else{
+		// 				FLAG_habilitar_manual = 1;
+		// 			}
 		FLAG_button_B_change=0;
 	}
+
 	
-	if(FLAG_habilitar_PID){
-		ONLEDGREEN;
-	}else{
-		vel = 0;
-		OFFLEDGREEN;
-	}
 	//	vel = getSlideResistor()*13.3-getPos();
 	
 	
+	
+	
+	
+	
+	//esto tendria que andar hacer test
+	// 	if(FLAG_habilitar_manual){
+	// 		posRefManual = getSlideResistor()*13.3;
+	// 		if(getPos() != posRefManual){
+	// 			if(posRefManual<getPos()){
+	// 				vel = vel-100;
+	// 			}else{
+	// 				vel = vel+100;
+	// 			}
+	// 		}else{
+	// 			vel = 0;
+	// 		}
+	// 		if(vel>1700) vel=1700;
+	// 		if(vel<-1700) vel=-1700;
+	// 	}else{
+	getAnguloEncoder(&e,&tiempoMuestra);
+	
+	vel = calcularError[indice_ec_error]();
+	
 	// no me gusta este pedazo de codigo
 	//tengo que poner un limite de acceleracion al codigo para que no patine el motor el motor
-	float velMax = vel*0.30;
-	
-	if (velMax>1700)
-	{
-		velMax = 1700;
+	//float velMax = vel*0.30;
+	//
+	// 	if (velMax>1700)
+	// 	{
+	// 		velMax = 1700;
+	// 	}
+	// 	if (velMax<-1700)
+	// 	{
+	// 		velMax = -1700;
+	// 	}
+	if(vel>1700) vel=1700;
+	if(vel<-1700) vel=-1700;
+	if(FLAG_habilitar_PID){
+		ONLEDGREEN;
+		}else{
+		vel = 0;
+		OFFLEDGREEN;
 	}
-	if (velMax<-1700)
-	{
-		velMax = -1700;
-	}
-	
-	if(vel>velMax) vel=velMax;
-	if(vel<velMax) vel=velMax;
+	//	}
 	
 	setVelocidad(vel);
 }
@@ -167,83 +200,10 @@ void calcularIntegral(int16_t e){
 
 
 void calcularDerivada_encoder(){
-	/*
-	//tambien quiero esto
-	//puedo ser que cuando no esta calculando porque no entro al if poner una suvisacion con un calculo actual
-	
-	derivadas[2] = derivadas[1];
-	derivadas[1] = derivadas[0];
-	derivadas[0] = (e-posAnt[0]);
-	derivada = 0.7 * derivadas[0]+ 0.15 * derivadas[1] + 0.15 * derivadas[2];
-	posAnt[0]=e;*/
-	
-	//tiempoMuestraSoft = (float)(0.02)*tiempoMuestra+(float)(0.98)*tiempoMuestraSoft;
-	
-	//axiAngulo = e-calcularSen(puntosAngulo+direccion)*100;
-	derivada_encoder = (20000/tiempoMuestra)*0.02+derivada_encoder*0.98;
-	//derivada_angulo = derivada_angulo*0.98+20000/tiempoMuestra*0.02;
-	
-	
-	/*i_derivative = (i_derivative+1)%CANT_DERIVATE;
-	derivadas[i_derivative] = (float)(tiempoMuestra);
-	uint8_t k;
-	float total = 0;
-	for(k=0;k<CANT_DERIVATE;k++){
-		total = total + derivadas[(i_derivative+CANT_DERIVATE-k)%CANT_DERIVATE];
-	}
-	derivada = total/CANT_DERIVATE;*/
-	//eant = e;
-	/*derivada =  0.50 * derivadas[(i_derivative+CANT_DERIVATE-0)%CANT_DERIVATE] +
-				0.25 * derivadas[(i_derivative+CANT_DERIVATE-1)%CANT_DERIVATE] +
-				0.125 * derivadas[(i_derivative+CANT_DERIVATE-2)%CANT_DERIVATE] +
-				0.0625 * derivadas[(i_derivative+CANT_DERIVATE-3)%CANT_DERIVATE] +
-				0.03125 * derivadas[(i_derivative+CANT_DERIVATE-4)%CANT_DERIVATE] +
-				0.0156 * derivadas[(i_derivative+CANT_DERIVATE-5)%CANT_DERIVATE] +
-				0.0 * derivadas[(i_derivative+CANT_DERIVATE-6)%CANT_DERIVATE] +
-				0.0 * derivadas[(i_derivative+CANT_DERIVATE-7)%CANT_DERIVATE] +
-				0.0 * derivadas[(i_derivative+CANT_DERIVATE-8)%CANT_DERIVATE] +
-				0.0 * derivadas[(i_derivative+CANT_DERIVATE-9)%CANT_DERIVATE] +
-				0.0 * derivadas[(i_derivative+CANT_DERIVATE-10)%CANT_DERIVATE] ;*/
-				
-	//derivada = 0.166 * derivadas[0]+ 0.166 * derivadas[1] + 0.166 * derivadas[2]+0.166 * derivadas[3]+0.166 * derivadas[4]+0.166 * derivadas[5];
-		/*
-		if(e == posAnt[0]){
-			derivada = (e-posAnt[1]);	//*100		  //maximo 47
-			tiempoDev = (getTiempoSEOS()-tiempoAnt[1]);//suele ser <20 cuando se mueve cayendo y 50 cuando va lento pero se mueve
-			derivada = derivada/tiempoDev;
-		}
-		
-		if(e != posAnt[0]){
-			derivada = (e-posAnt[0]);//*100;		  //maximo 47
-			tiempoDev = (getTiempoSEOS()-tiempoAnt[0]);//suele ser <20 cuando se mueve cayendo y 50 cuando va lento pero se mueve
-			derivada = derivada;///tiempoDev;
-			
-			posAnt[1]=posAnt[0];
-			tiempoAnt[1]=tiempoAnt[0];
-			posAnt[0]=e;
-			tiempoAnt[0]=getTiempoSEOS();
-		}
-	}*//*else{
-		derivadas[2] = derivadas[1];
-		derivadas[1] = derivadas[0];
-		derivadas[0] = (e-posAnt[0]);
-		derivada = 0.7 * derivadas[0]+ 0.15 * derivadas[1] + 0.15 * derivadas[2];
-	}*/
-	
-// 	if(e == posAnt[0]){
-// 		derivada = (posAnt[0]-posAnt[1])/(tiempo-tiempoAnt[1]);
-// 		tiempoAnt[1] = (tiempoAnt[0]-tiempoAnt[1])/2;
-// 	}else{
-// 		tiempoAnt[1]=tiempoAnt[0];
-// 		posAnt[1]=posAnt[0];
-// 		derivada=(e-posAnt[0])/(tiempo-tiempoAnt[0]);
-// 		posAnt[0]=e;
-// 		tiempoAnt[0]=tiempo;
-// 	}
+	derivada_encoder = (15625/tiempoMuestra)*0.02+derivada_encoder*0.98;	//(20000/tiempoMuestra)*0.02+derivada_encoder*0.98;
 }
 
 void setKi(float val){
-	LIMITESUPI = 1700/val;
 	Ki=val;
 }
 void setKd(float val){
@@ -270,7 +230,7 @@ int16_t calcularSen(int16_t sen){
 		sen = sen%400;
 		if(sen>200) sen = 200-(sen%200);
 		sen = - sen2[sen];
-	}else{
+		}else{
 		sen = sen%400;
 		if(sen>200) sen = 200-(sen%200);
 		sen = sen2[sen];
@@ -280,20 +240,23 @@ int16_t calcularSen(int16_t sen){
 
 void calcularDerivada_angulo(int16_t e){
 	calcularDerivada_encoder();
-	derivada_angulo = calcularSen(e+200)*(derivada_encoder/1000);
+	derivada_angulo = calcularSen(e+200)*(derivada_encoder/1000)*(float)51.05088;
 	//la derivada de la posicion tiene que ser
 	//calcularSen(e+200)*0.00255*(derivada_encoder/1000);
 }
 
-float ec_basico(){
+float ec_basicoREAL(){
 	int8_t multi=1;
 	puntosAngulo = e;
 	e = e % 800;
 	if(e<0){
 		e = 800+e;
 	}
-	if(e > 350 && e < 450){
+	if(e > 250 && e < 550){
 		multi = -1;
+		Kp=1;
+		}else{
+		Kp=0;
 	}
 	e=calcularSen(e);
 	valor = e;
@@ -304,8 +267,132 @@ float ec_basico(){
 	return( (multi*Kp)*e + Kd*derivada + Ki*s);
 }
 
-float ec_sin_sen(){	
+float levantar() {
+	float vel;
+	int16_t e_original = e;
+	puntosAngulo = e;
+	e = e % 800;  // Mantener e en el rango de -799 a
+
+	if (e < 0) {
+		e = 800 + e;  // Ajustar e para que esté en el rango de 0 a 799
+	}
+
+	if (fueMayor100==1) {
+		if (e > 370 && e < 430) {
+			// Cambio de estado arriba porque está arriba
+			estado = 1;
+			fueMayor100 = 0;
+			if (e > 400) {
+				vel = -500;
+				} else {
+				vel = 500;
+			}
+		}
+		calcularDerivada_angulo(puntosAngulo);
+		derivada = derivada_angulo;
+		e = calcularSen(e);
+		valor = e;
+		vel = -0.8 * e; // +derivada*20; // -5 30 -3.5 15
+	}
+	if (fueMayor100==0) {
+		e_original = abs(e_original)+400; //le sumo 400 porque es media vuelta
+		if (e_original%800 > 500) {  // Comprobación si la magnitud de puntosAngulo supera 100
+			fueMayor100 = 1;
+		}
+		vel = 1.50 * calcularSen(((int16_t) (((float)getTiempoSEOS())/(2.42)) )%800);
+	}
 	
+	return vel;
+}
+
+
+
+float superArriba(){
+	puntosAngulo = e;
+	e = e % 800;
+	valor = e;
+	if(e<0){
+		e = 800+e;
+	}
+	if( !(e > 350 && e < 450)){
+		estado =2;
+		vel=0;
+	}
+	
+	calcularDerivada_angulo(puntosAngulo);
+	derivada = derivada_angulo;
+	e=calcularSen(e);
+	valor=e;
+	vel =Kp*e+Kd*derivada;//70 30   50 70  50 30
+	/*
+	e = abs(e)%800 - 400;
+
+	if( !(e < 20 && e > -20)){
+	estado =2;
+	vel=0;
+	}
+
+	if(e>0){
+	calcularIntegral(1);
+	return(Kp*sqrt(e)+Ki*s);
+	}else{
+	if(e<0){
+	e = (-1)*e;
+	calcularIntegral(-1);
+	return(Kp*sqrt(e)*(-1)+Ki*s);
+	}
+	}
+	
+	// 	if(e>0){
+	// 		calcularIntegral(1);
+	// 		return((float)-400*sqrt(e)+Ki*s);
+	// 		}else{
+	// 		if(e<0){
+	// 			e = (-1)*e;
+	// 			calcularIntegral(-1);
+	// 			return((float)-400*sqrt(e)*(-1)+Ki*s);
+	// 		}
+	// 	}
+	*/
+}
+
+float frenoAbajo(){
+	puntosAngulo = e;
+	e=calcularSen(e);
+	
+	//aca cambio de estado lo tengo que pasar a subir arriba
+	if(e>-20 && e<20){
+		countStop++;
+		if (countStop>50){
+			countStop=0;
+			fueMayor100=0;
+			estado=0;
+		}
+		}else{
+		countStop=0;
+	}
+	
+	e = e*6.5;	//el lagro es: 20
+	valor = getPos()+e;
+	
+	posRef = 7500;
+	//Para derivada y posRef
+	e = posRef-getPos()+e;		//e = posRef-getPos()+e*6.5; lo hago por partes
+	
+	derivada = derivada_pos;
+	calcularIntegral(e);
+	
+	return(0.7*e);
+}
+
+float ec_basico(){
+	//State stateBalance[] = {levantar,superArriba,frenoAbajo};
+	return(stateBalance[estado]());
+}
+
+float ec_sin_sen(){
+	
+	/*
 	//hago que vuelva
 	e= e;//%800;
 	valor = e;
@@ -313,8 +400,25 @@ float ec_sin_sen(){
 	calcularDerivada_encoder(e);
 	calcularIntegral(e);
 	derivada = derivada_encoder;
-	
-	return( Kp*e + Kd*derivada + Ki*s);
+	*/
+
+	e = abs(e+400)%800 - 400;
+	//  	if(e<0){
+	//  		e = 800+e;
+	//  	}
+
+	// 	if(e>0){
+	// 		calcularIntegral(1);
+	// 		return(Kp*sqrt(e)+Ki*s);
+	// 		}else{
+	// 		if(e<0){
+	// 			e = (-1)*e;
+	// 			calcularIntegral(-1);
+	// 			return(Kp*sqrt(e)*(-1)+Ki*s);
+	// 		}
+	// 	}
+	return 0;
+	//return( Kp*e + Kd*derivada + Ki*s);
 }
 
 void calcularDerivada_pos(int16_t e){
@@ -323,7 +427,16 @@ void calcularDerivada_pos(int16_t e){
 	//con eso tendria que andar 10 puntos
 	calcularDerivada_angulo(e);
 	//vel + derivada_angulo*6.5;
-	derivada_pos = derivada_angulo + vel*(8.0645);
+	float velAxi=vel;
+	if (vel>1700)
+	{
+		velAxi=1700;
+	}
+	if (vel<-1700)
+	{
+		velAxi=-1700;
+	}
+	derivada_pos = derivada_angulo - velAxi*(8.0645);
 	//int16_t calculoAxi = e - eant;
 	//eant = e;
 	//derivada = (float)(0.02)*(float)calculoAxi+(float)(0.98)*derivada;
