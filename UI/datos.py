@@ -135,16 +135,17 @@ class GeneradorArduino(GeneradorDatos):
                 axid = hex_to_int(data_values[3][0:])
                 axiset = hex_to_int(data_values[4][0:])
                 # Intenta convertir la cadena a un número entero en hexadecimal
-                self.t_values.append(axit)
-                self.e_values.append(axie)
-                self.i_values.append(axii)
-                self.d_values.append(axid)
-                if self.ecuacion != 2:
-                    self.set_values.append(0)
-                else:
-                    self.set_values.append(axiset)
-                #print(t_values[-1],e_values[-1],set_values[-1])
-                self.datoNuevoEnviar = True
+                if self.t_values[-1]<axit and axit<self.t_values[-1]+10000:
+                    self.t_values.append(axit)
+                    self.e_values.append(axie)
+                    self.i_values.append(axii)
+                    self.d_values.append(axid)
+                    if self.ecuacion != 2:
+                        self.set_values.append(0)
+                    else:
+                        self.set_values.append(axiset)
+                    #print(t_values[-1],e_values[-1],set_values[-1])
+                    self.datoNuevoEnviar = True
             
             except ValueError:
                 print("Arduino: "+self.a)

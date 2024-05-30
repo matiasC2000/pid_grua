@@ -21,7 +21,9 @@
 #define ZONAMUERTA 0
 #define ZONAMUERTAI 10000
 
-#define LIMITESUPI 5000
+#define LIMITESUPI 1500
+//arriba 1700
+//pos 700
 
 //ki 4 Kp-170
 
@@ -42,14 +44,14 @@ float static Kd = 0,Kp = 1, Ki=0;
 //int16_t static Kd = 0,Kp = 3, Ki=0;
 
 uint8_t FLAG_habilitar_PID=1,i_derivative=0,cambio=1,FLAG_habilitar_manual=1;
-uint8_t estado=0,countStop=0,fueMayor100=0;
-float static vel,velAnt=0, s = 0,posRef, derivada=0,derivada_encoder=0,derivada_angulo=0,derivada_pos=0,derivadaAnt=0;
+uint8_t estado=0,countStop=0,fueMayor100=0,noFueCero=1,enPosicion=0;
+float static floate=0,vel,velAnt=0, s = 0,posRef, derivada=0,derivada_encoder=0,derivada_angulo=0,derivada_pos=0,derivadaAnt=0;
 uint16_t posRefManual;
 float derivadas[CANT_DERIVATE];
 float tiempoMuestraSoft=32000;
 int16_t static e,tiempoDev,valor, eant = 0;;
 int16_t static tiempoMuestra=0;
-uint8_t vecesIgual=1,indice_ec_error = 0;
+uint8_t vecesIgual=1,indice_ec_error = 1;
 int16_t puntosAngulo;
 int8_t direccion=0;
 
@@ -155,15 +157,51 @@ void Actulizar_PID(){
 	// 	{
 	// 		velMax = -1700;
 	// 	}
-	if(vel>1700) vel=1700;
-	if(vel<-1700) vel=-1700;
+	if(vel>1500) vel=1500;
+	if(vel<-1500) vel=-1500;
 	if(FLAG_habilitar_PID){
-		ONLEDGREEN;
+		noFueCero=1;
+		if(indice_ec_error==EC_POS){
+			if(enPosicion==0){
+				vel=0;
+				posRef = getSlideResistor()*13.3;
+				if(getPos()>(uint16_t)posRef-100 && getPos()<(uint16_t)posRef+100){
+					enPosicion=1;
+					ONLEDGREEN;
+				}
+			}	
 		}else{
-		vel = 0;
-		OFFLEDGREEN;
+			ONLEDGREEN;
+		}
+	}else{
+		if(indice_ec_error==EC_POS){
+			//modo velocidad manual
+			enPosicion=0;
+			posRef = getSlideResistor();
+			valor = getSlideResistor();
+			if(noFueCero==0){
+				if(posRef<485){
+					vel = 4*(posRef - 485);
+					}else{
+					if(posRef>515){
+						vel = 4*(posRef-515);
+						}else{
+						vel = 0;
+					}
+				}
+				}else{
+				if(posRef>485 && posRef<515){
+					noFueCero=0;
+				}
+				vel = 0;
+			}
+			OFFLEDGREEN;
+		}else{
+			OFFLEDGREEN;
+			vel=0;
+		}
+		
 	}
-	//	}
 	
 	setVelocidad(vel);
 }
@@ -200,7 +238,11 @@ void calcularIntegral(int16_t e){
 
 
 void calcularDerivada_encoder(){
-	derivada_encoder = (15625/tiempoMuestra)*0.02+derivada_encoder*0.98;	//(20000/tiempoMuestra)*0.02+derivada_encoder*0.98;
+	if(tiempoMuestra < 29000){
+		derivada_encoder = (15625/tiempoMuestra)*0.02+derivada_encoder*0.98;	//(20000/tiempoMuestra)*0.02+derivada_encoder*0.98;	
+	}else{
+		derivada_encoder = 0+derivada_encoder*0.98;	//(20000/tiempoMuestra)*0.02+derivada_encoder*0.98;	
+	}
 }
 
 void setKi(float val){
@@ -264,7 +306,7 @@ float ec_basicoREAL(){
 	calcularIntegral(e);
 	derivada = derivada_angulo;
 	
-	return( (multi*Kp)*e + Kd*derivada + Ki*s);
+	return( (multi*Kp)*e + Kd*derivada + s);
 }
 
 float levantar() {
@@ -278,9 +320,10 @@ float levantar() {
 	}
 
 	if (fueMayor100==1) {
-		if (e > 370 && e < 430) {
+		if (e > 372 && e < 428) {
 			// Cambio de estado arriba porque está arriba
 			estado = 1;
+			s = 0;
 			fueMayor100 = 0;
 			if (e > 400) {
 				vel = -500;
@@ -314,6 +357,7 @@ float superArriba(){
 	if(e<0){
 		e = 800+e;
 	}
+	e = e+1;
 	if( !(e > 350 && e < 450)){
 		estado =2;
 		vel=0;
@@ -322,8 +366,9 @@ float superArriba(){
 	calcularDerivada_angulo(puntosAngulo);
 	derivada = derivada_angulo;
 	e=calcularSen(e);
+	calcularIntegral(e);
 	valor=e;
-	vel =Kp*e+Kd*derivada;//70 30   50 70  50 30
+	vel =Kp*e+s+Kd*derivada;//30 0.2	//28	3
 	/*
 	e = abs(e)%800 - 400;
 
@@ -402,22 +447,26 @@ float ec_sin_sen(){
 	derivada = derivada_encoder;
 	*/
 
-	e = abs(e+400)%800 - 400;
+//	e = abs(e+400)%800 - 400;
 	//  	if(e<0){
 	//  		e = 800+e;
 	//  	}
 
-	// 	if(e>0){
-	// 		calcularIntegral(1);
-	// 		return(Kp*sqrt(e)+Ki*s);
-	// 		}else{
-	// 		if(e<0){
-	// 			e = (-1)*e;
-	// 			calcularIntegral(-1);
-	// 			return(Kp*sqrt(e)*(-1)+Ki*s);
-	// 		}
-	// 	}
-	return 0;
+	floate = e*6.28/800;
+	valor = e;
+	
+	if(floate>0){
+		calcularIntegral(1);
+		return(Kp*sqrt(floate)+s);
+	}else{
+		if(floate<0){
+			floate = (-1)*floate;
+			calcularIntegral(-1);
+			return(Kp*sqrt(floate)*(-1)+s);
+	 	}else{
+			 return 0;
+		 }
+	 }
 	//return( Kp*e + Kd*derivada + Ki*s);
 }
 
@@ -475,5 +524,5 @@ float ec_pos(){
 	derivada = derivada_pos;
 	
 	calcularIntegral(e);
-	return( Kp*e + Kd*derivada + Ki*s );
+	return( Kp*e + Kd*derivada + s );	//0.3   0.07
 }

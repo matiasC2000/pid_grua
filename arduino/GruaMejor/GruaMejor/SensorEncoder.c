@@ -87,13 +87,19 @@ void SensorEncoder_init(){
 void getAnguloEncoder(int16_t *anguloOUT, int16_t *tiempoMuestraOUT){
 	*anguloOUT = angulo;
 	if(tiempoMuestraOUT!=0){
-		*tiempoMuestraOUT =anguloANt*(derivate_D + derivate_I)/2;
+		*tiempoMuestraOUT = anguloANt*(derivate_D + derivate_I)/2;
 		
 		if(*tiempoMuestraOUT == axiAnt){
-			*tiempoMuestraOUT = anguloANt*(derivate_D + derivate_I)/2+ anguloANt*derivate_counter_D/2;
+			if(derivate_counter_D > derivate_counter_I){
+				*tiempoMuestraOUT = anguloANt*derivate_counter_D;	
+			}else{
+				*tiempoMuestraOUT = anguloANt*derivate_counter_I;	
+			}
 		}
+		
+		axiAnt= anguloANt*(derivate_D + derivate_I)/2;;
+		
 		signoAnt= anguloANt;
-		axiAnt= *tiempoMuestraOUT;
 	}
 }
 
@@ -185,6 +191,6 @@ void f11(void){
 ISR(TIMER2_COMPA_vect) {
 // 	derivate_counter_D=derivate_counter_D+derivate_counter_D==32000;
 // 	derivate_counter_I=derivate_counter_I+derivate_counter_I==32000;
-	if(derivate_counter_D!=32000)derivate_counter_D++;
-	if(derivate_counter_I!=32000)derivate_counter_I++;
+	if(derivate_counter_D<31000)derivate_counter_D++;
+	if(derivate_counter_I<31000)derivate_counter_I++;
 }
