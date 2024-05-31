@@ -21,7 +21,7 @@
 #define ZONAMUERTA 0
 #define ZONAMUERTAI 10000
 
-#define LIMITESUPI 1500
+#define LIMITESUPI 500
 //arriba 1700
 //pos 700
 
@@ -51,7 +51,7 @@ float derivadas[CANT_DERIVATE];
 float tiempoMuestraSoft=32000;
 int16_t static e,tiempoDev,valor, eant = 0;;
 int16_t static tiempoMuestra=0;
-uint8_t vecesIgual=1,indice_ec_error = 1;
+uint8_t vecesIgual=1,indice_ec_error = 2;
 int16_t puntosAngulo;
 int8_t direccion=0;
 
@@ -231,7 +231,7 @@ int16_t getValor(){
 }
 
 void calcularIntegral(int16_t e){
-	s += Ki*e;
+	s += e;
 	if(s > LIMITESUPI) s = LIMITESUPI;
 	if(s < -LIMITESUPI) s = -LIMITESUPI;
 }
@@ -357,18 +357,25 @@ float superArriba(){
 	if(e<0){
 		e = 800+e;
 	}
-	e = e+1;
+	e = e-1;
 	if( !(e > 350 && e < 450)){
 		estado =2;
 		vel=0;
 	}
+	if(getPos()>8000){
+		e = e+1;
+	}
 	
+	if(getPos()<5000){
+		e = e-1;
+	}
 	calcularDerivada_angulo(puntosAngulo);
 	derivada = derivada_angulo;
 	e=calcularSen(e);
 	calcularIntegral(e);
 	valor=e;
-	vel =Kp*e+s+Kd*derivada;//30 0.2	//28	3
+	vel =Kp*e+Ki*s+Kd*derivada;//30 0.2	//28	3
+	//anduvo 10 mins kp16 Ki1 #define LIMITESUPI 500
 	/*
 	e = abs(e)%800 - 400;
 
@@ -524,5 +531,5 @@ float ec_pos(){
 	derivada = derivada_pos;
 	
 	calcularIntegral(e);
-	return( Kp*e + Kd*derivada + s );	//0.3   0.07
+	return( Kp*e + Kd*derivada + Ki*s );	//0.3   0.07
 }

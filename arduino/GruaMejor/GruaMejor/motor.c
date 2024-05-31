@@ -150,7 +150,7 @@ uint16_t getPos(){
 }
 
 void irPos(uint16_t destino){
-	PASOS16;salto=16;
+	PASOS1;salto=1;
 	_delay_ms(100);
 	if(destino>0 && destino<FIN){
 		if(pos<destino)
@@ -176,9 +176,11 @@ void darPaso(int8_t sentido){
 		lado = 1;
 	}
 	PORTB |=  (1<<PORTB2); //pongo en 1 el esclon de step
-	_delay_ms(2);
+	//_delay_ms(1);
+	_delay_us(50);
 	PORTB &=  ~(1<<PORTB2); //pongo en 0 el escalon de step
-	_delay_ms(2);
+	//_delay_ms(1);
+	_delay_us(50);
 }
 
 
@@ -194,7 +196,7 @@ void buscarOrigen(){
 	ONLEDBLUE;
 	
 	_delay_ms(500);			//espero un poco porque el pinta salir corriendo a veces
-	PASOS16;salto=16;
+	PASOS1;salto=1;
 	while((PIND & (1<<PORTD4))){	//mientras no toque el boton
 		darPaso(-1);
 	}
