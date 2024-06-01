@@ -362,13 +362,21 @@ float superArriba(){
 		estado =2;
 		vel=0;
 	}
-	if(getPos()>8000){
+	posRef = getSlideResistor()*13.3;
+	posRef = posRef - getPos();
+	if(posRef>1000){
 		e = e+1;
 	}
-	
-	if(getPos()<5000){
+	if(posRef<-1000){
 		e = e-1;
 	}
+// 	if(getPos()>8000){
+// 		e = e-1;
+// 	}
+// 	
+// 	if(getPos()<5000){
+// 		e = e+1;
+// 	}
 	calcularDerivada_angulo(puntosAngulo);
 	derivada = derivada_angulo;
 	e=calcularSen(e);
